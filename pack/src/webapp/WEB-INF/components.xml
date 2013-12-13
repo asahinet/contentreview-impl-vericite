@@ -4,7 +4,7 @@
 <beans>
 
 	<bean
-		id="org.sakaiproject.contentreview.service.ContentReviewService"
+		id="org.sakaiproject.contentreview.service.ContentReviewServiceLongsight"
 		class="org.sakaiproject.contentreview.impl.ContentReviewServiceImpl"
 		init-method="init">
 		 <property name="serverConfigurationService" ref="org.sakaiproject.component.api.ServerConfigurationService" />
