@@ -117,19 +117,19 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	}
 
 	public String getIconUrlforScore(Long score) {
-		String urlBase = "/sakai-contentreview-tool/images/score_";
-		String suffix = ".gif";
+		String urlBase = "/sakai-contentreview-tool/images/";
+		String suffix = ".png";
 
 		if (score.equals(Long.valueOf(0))) {
-			return urlBase + "blue" + suffix;
+			return urlBase + "blueflag" + suffix;
 		} else if (score.compareTo(Long.valueOf(25)) < 0 ) {
-			return urlBase + "green" + suffix;
+			return urlBase + "greenflag" + suffix;
 		} else if (score.compareTo(Long.valueOf(50)) < 0  ) {
-			return urlBase + "yellow" + suffix;
+			return urlBase + "yellowflag" + suffix;
 		} else if (score.compareTo(Long.valueOf(75)) < 0 ) {
-			return urlBase + "orange" + suffix;
+			return urlBase + "orangeflag" + suffix;
 		} else {
-			return urlBase + "red" + suffix;
+			return urlBase + "redflag" + suffix;
 		}
 	}
 
