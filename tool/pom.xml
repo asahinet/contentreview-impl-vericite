@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <name>Longsight WebApp</name>
     <groupId>org.sakaiproject</groupId>
-    <artifactId>sakai-contentreview-tool</artifactId>
+    <artifactId>sakai-contentreview-tool-longsight</artifactId>
     <packaging>war</packaging>
     <parent>
         <groupId>org.sakaiproject.contentreview</groupId>

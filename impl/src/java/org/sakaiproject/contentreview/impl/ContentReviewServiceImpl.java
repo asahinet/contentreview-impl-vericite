@@ -117,7 +117,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	}
 
 	public String getIconUrlforScore(Long score) {
-		String urlBase = "/sakai-contentreview-tool/images/";
+		String urlBase = "/sakai-contentreview-tool-longsight/images/";
 		String suffix = ".png";
 
 		if (score.equals(Long.valueOf(0))) {
