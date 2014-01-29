@@ -200,6 +200,8 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 				    	instructorSiteTokenCache.remove(context);
 				    }
 				}
+				//this is an instructor, give them instructor role when viewing a report 
+				params.put(PARAM_USER_ROLE, PARAM_USER_ROLE_INSTRUCTOR); 
 			}
 			String url = generateUrl(context, null, null);
 			if(token == null){
