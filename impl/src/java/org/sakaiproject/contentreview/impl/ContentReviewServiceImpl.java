@@ -3,6 +3,8 @@ package org.sakaiproject.contentreview.impl;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -239,7 +241,11 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 						if(!"".equals(urlParameters)){
 							urlParameters += "&";
 						}
-						urlParameters += entry.getKey() + "=" + entry.getValue();
+						try {
+							urlParameters += entry.getKey() + "=" + URLEncoder.encode(entry.getValue(), "UTF-8");
+						} catch (UnsupportedEncodingException e) {
+							e.printStackTrace();
+						}
 					}
 				}
 				return url + "?" + urlParameters;
