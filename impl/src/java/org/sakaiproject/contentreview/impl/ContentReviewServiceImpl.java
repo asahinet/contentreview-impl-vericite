@@ -179,7 +179,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 		return getAccessUrl(contentId, false);
 	}
 	
-	private String getAccessUrl(String contentId, boolean instructor){
+	private String getAccessUrl(String contentId, boolean instructor) throws QueueException, ReportException {
 		String[] contentSplit = contentId.split("/");
 		if(contentSplit.length > 2){
 			String context = contentSplit[2];
@@ -215,9 +215,15 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 					params.put(PARAM_EXTERNAL_CONTENT_ID, contentId);
 				}
 				params.put(PARAM_TOKEN_REQUEST, "true");
-				JSONObject results = getResults(url, params);
-				if(results != null){
-					token = results.getString(PARAM_TOKEN);
+				JSONObject results;
+				try {
+					results = getResults(url, params);
+					if(results != null){
+						token = results.getString(PARAM_TOKEN);
+					}
+
+				} catch (Exception e) {
+					throw new ReportException(e);
 				}
 			}
 			if(token != null){
@@ -244,15 +250,15 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 						try {
 							urlParameters += entry.getKey() + "=" + URLEncoder.encode(entry.getValue(), "UTF-8");
 						} catch (UnsupportedEncodingException e) {
-							e.printStackTrace();
+							throw new ReportException(e);
 						}
 					}
 				}
 				return url + "?" + urlParameters;
 			}
 		}
-		
-		return null;
+		//shouldn't get here is all went well:
+		throw new ReportException("Token was null or contentId wasn't correct: " + contentId);
 	}
 
 	public int getReviewScore(String contentId) throws QueueException,
@@ -261,7 +267,6 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 		 * contentId: /attachment/04bad844-493c-45a1-95b4-af70129d54d1/Assignments/b9872422-fb24-4f85-abf5-2fe0e069b251/plag.docx
 		 */
 		
-		int score = 0;
 		String[] contentSplit = contentId.split("/");
 		if(contentSplit.length > 2){
 			String context = contentSplit[2];
@@ -271,11 +276,11 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 			params.put(PARAM_EXTERNAL_CONTENT_ID, contentId);
 			JSONObject results = getResults(generateUrl(context, null, null), params);
 			if(results != null && results.size() == 1){
-				score = new ArrayList<Integer>(results.values()).get(0);
+				return new ArrayList<Integer>(results.values()).get(0);
 			}
 		}
-		
-		return score;
+		//couldn't find score, throw an error
+		throw new ReportException("Couldn't find report score for contentId: " + contentId);
 	}
 
 	public Long getReviewStatus(String contentId) throws QueueException {
@@ -388,7 +393,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	 * returns a map of {User => Score}
 	 * @return
 	 */
-	public JSONObject getResults(String url, Map<String, String> params){
+	public JSONObject getResults(String url, Map<String, String> params) throws Exception{
 
 		HttpClient client = HttpClientBuilder.create().build();
 		HttpPost post = new HttpPost(url);
@@ -402,9 +407,8 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 			HttpResponse response = client.execute(post);
 			return JSONObject.fromObject(getContent(response));
 		} catch (Exception e) {
-			e.printStackTrace();
+			throw new Exception(e);
 		}
-		return null;
 	}
 	
 	private String generateUrl(String context, String assignment, String user){
