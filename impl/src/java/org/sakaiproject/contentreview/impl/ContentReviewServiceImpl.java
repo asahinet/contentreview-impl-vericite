@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -74,6 +75,11 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	// ContextId -> Object{token, date}
 	private Map<String, Object[]> instructorSiteTokenCache = new HashMap<String, Object[]>();
 	private static final int CACHE_EXPIRE_MINS = 20;
+	
+	//Caches the content review item scores
+	// Assignment -> {user -> Object{score, date}}
+	private Map<String, Map<String, Object[]>> contentScoreCache = new HashMap<String, Map<String, Object[]>>();
+	private static final int CONTENT_SCORE_CACHE_MINS = 5;
 	
 	public void init(){
 		serviceUrl = serverConfigurationService.getString("longsightPlagiarism.serviceUrl", "");
@@ -262,25 +268,96 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	}
 
 	public int getReviewScore(String contentId) throws QueueException,
+	ReportException, Exception {
+		return getReviewScore(contentId, null, null);
+	}
+	
+	public int getReviewScore(String contentId, String assignmentRef, String userId) throws QueueException,
 			ReportException, Exception {
 		/**
 		 * contentId: /attachment/04bad844-493c-45a1-95b4-af70129d54d1/Assignments/b9872422-fb24-4f85-abf5-2fe0e069b251/plag.docx
+		 * assignmentRef: /assignment/a/f7d8c921-7d5a-4116-8781-9b61a7c92c43/cbb993da-ea12-4e74-bab1-20d16185a655
 		 */
 		
-		String[] contentSplit = contentId.split("/");
-		if(contentSplit.length > 2){
-			String context = contentSplit[2];
-			Map<String, String> params = new HashMap<String, String>();
-			params.put(PARAM_CONSUMER, consumer);
-			params.put(PARAM_CONSUMER_SECRET, consumerSecret);
-			params.put(PARAM_EXTERNAL_CONTENT_ID, contentId);
-			JSONObject results = getResults(generateUrl(context, null, null), params);
-			if(results != null && results.size() == 1){
-				return new ArrayList<Integer>(results.values()).get(0);
+		//first check if contentId already exists in cache:
+		Integer score = null;
+		String assignment = null;
+		if(assignmentRef != null){
+			String[] assignmentSplit = assignmentRef.split("/");
+			if(assignmentSplit.length > 4){
+				assignment = assignmentSplit[4];
+			}
+			if(assignment != null && contentScoreCache.containsKey(assignment) 
+					&& contentScoreCache.get(assignment).containsKey(userId)){
+				Object[] cacheItem = contentScoreCache.get(assignment).get(userId);
+				Calendar cal = Calendar.getInstance();
+				cal.setTime(new Date());
+				//subtract the exipre time
+				cal.add(Calendar.MINUTE, CONTENT_SCORE_CACHE_MINS * -1);
+				if(((Date) cacheItem[1]).after(cal.getTime())){
+					//token hasn't expired, use it
+					score = (Integer) cacheItem[0];
+				}else{
+					//token is expired, remove it
+					contentScoreCache.get(assignment).remove(userId);
+				}
 			}
 		}
-		//couldn't find score, throw an error
-		throw new ReportException("Couldn't find report score for contentId: " + contentId);
+		
+		if(score == null){
+			//wasn't in cache
+			String[] contentSplit = contentId.split("/");
+			if(contentSplit.length > 2){
+				String context = contentSplit[2];
+				Map<String, String> params = new HashMap<String, String>();
+				params.put(PARAM_CONSUMER, consumer);
+				params.put(PARAM_CONSUMER_SECRET, consumerSecret);
+				if(assignmentRef == null){
+					params.put(PARAM_EXTERNAL_CONTENT_ID, contentId);
+				}
+				//returns a map of {userId -> {assignment -> score}} for all users
+				JSONObject results = getResults(generateUrl(context, assignment, null), params);
+				if(results != null){
+					for (Iterator iterator = results.keys(); iterator.hasNext();) {
+						String userIdKey = (String) iterator.next();
+						JSONObject userAssignments = results.getJSONObject(userIdKey);
+						if(userAssignments != null){
+							for (Iterator iterator2 = userAssignments.keys(); iterator2.hasNext();) {
+								String assignmentId = (String) iterator2.next();
+								score = userAssignments.getInt(assignmentId);
+								 Map<String, Object[]> cacheMap = contentScoreCache.get(assignmentId);
+								 if(cacheMap == null){
+									 cacheMap = new HashMap<String, Object[]>();
+								 }
+								cacheMap.put(userIdKey, new Object[]{score, new Date()});
+								contentScoreCache.put(assignmentId, cacheMap);
+							}
+						}
+					}
+				}
+				if(score == null){
+					//nothing was found, throw exception for this contentId
+					throw new QueueException("No report was found for contentId: " + contentId);
+				}else{
+					if(assignmentRef == null){
+						//score wasn't null and there should have only been one score, so just return that value
+						return score;
+					}else{
+						//grab the score from the map if it exists, if not, then there could have been an error:
+						if(contentScoreCache.containsKey(assignment) && contentScoreCache.get(assignment).containsKey(userId)){
+							return (Integer) contentScoreCache.get(assignment).get(userId)[0];
+						}else{
+							throw new QueueException("No report was found for contentId: " + contentId);		
+						}
+					}
+				}
+			}else{
+				//content id is bad
+				throw new ReportException("Couldn't find report score for contentId: " + contentId);
+			}
+		}else{
+			return score;
+		}
 	}
 
 	public Long getReviewStatus(String contentId) throws QueueException {
