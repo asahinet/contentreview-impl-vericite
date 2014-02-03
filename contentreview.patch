@@ -1,0 +1,14 @@
+Index: content-review-api/public/src/java/org/sakaiproject/contentreview/service/ContentReviewService.java
+===================================================================
+--- content-review-api/public/src/java/org/sakaiproject/contentreview/service/ContentReviewService.java	(revision 133959)
++++ content-review-api/public/src/java/org/sakaiproject/contentreview/service/ContentReviewService.java	(working copy)
+@@ -64,6 +64,9 @@
+ 	  */
+ 	public int getReviewScore(String contentId)
+ 	throws QueueException, ReportException, Exception;
++
++	public int getReviewScore(String contentId, String assignmentRef, String userId) throws QueueException,
++                        ReportException, Exception;
+ 	
+ 	/**
+ 	 *  Get the URL of the report

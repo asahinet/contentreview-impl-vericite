@@ -1,8 +1,8 @@
 Index: assignment-bundles/resources/assignment.properties
 ===================================================================
---- assignment-bundles/resources/assignment.properties	(revision 130967)
+--- assignment-bundles/resources/assignment.properties	(revision 134005)
 +++ assignment-bundles/resources/assignment.properties	(working copy)
-@@ -658,7 +658,7 @@
+@@ -664,7 +664,7 @@
  
  review.use = Use {0}
  review.allow = Allow students to view report
@@ -13,7 +13,7 @@ Index: assignment-bundles/resources/assignment.properties
  review.submit.papers.repository.standard=Standard Paper Repository
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(revision 130967)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(revision 134005)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(working copy)
 @@ -540,7 +540,7 @@
  					#if ($allowReviewService && $assignment.getContent().AllowReviewService)
@@ -26,7 +26,7 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  										<img id="sort_ascending_review" src = "#imageLink("sakai/sortascending.gif")" border="0" alt="$tlang.getString("gen.sorasc")" /> 
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm	(revision 130967)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm	(revision 134005)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm	(working copy)
 @@ -136,7 +136,7 @@
  				#if($allowReviewService && $assignment.getContent().AllowReviewService && $assignment.getContent().AllowStudentViewReport)
@@ -39,7 +39,7 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_vi
  							#if (!$submission)
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm	(revision 130967)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm	(revision 134005)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm	(working copy)
 @@ -197,7 +197,7 @@
  				#if($allowReviewService && $assignment.getContent().AllowReviewService && $assignment.getContent().AllowStudentViewReport)
@@ -52,9 +52,9 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  							#if (!$submission)
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(revision 130967)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(revision 134005)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(working copy)
-@@ -631,12 +631,24 @@
+@@ -603,12 +603,24 @@
  						$reviewServiceUse
  					</label>
  				</div>
@@ -80,7 +80,7 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  					$tlang.getString("content_review.note")
  					
  					$tlang.getString("review.submit.papers.repository")
-@@ -664,17 +676,6 @@
+@@ -636,17 +648,6 @@
  						#end
  					</div>
  					<br/>
@@ -98,8 +98,8 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  					#if($show_NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_BIBLIOGRAPHIC || $show_NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_QUOTED || $show_NEW_ASSIGNMENT_REVIEW_SERVICE_EXCLUDE_SMALL_MATCHES)
  						$tlang.getString("review.exclude.matches.header")
  						<br/>
-@@ -799,6 +800,7 @@
- 					</div>
+@@ -769,6 +770,7 @@
+ 						#end
  					</div>
  				</div>
 +				#end
@@ -108,9 +108,9 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  		#if ($!withGrade && $!withGradebook)
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm	(revision 130967)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm	(revision 134005)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm	(working copy)
-@@ -288,7 +288,7 @@
+@@ -297,7 +297,7 @@
  				#if($!submitted && $!timeSubmitted && $allowReviewService && $assignment.getContent().AllowReviewService && $assignment.getContent().AllowStudentViewReport)
  					<tr>
  						<th>
@@ -119,3 +119,16 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_vi
  						</th>
  							<td>
  							#if ($submission.getReviewReport().equalsIgnoreCase("Error"))
+Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java
+===================================================================
+--- assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java	(revision 134005)
++++ assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java	(working copy)
+@@ -10255,7 +10255,7 @@
+                         return -2;
+                     }
+ 
+-					int score = contentReviewService.getReviewScore(contentId);
++					int score = contentReviewService.getReviewScore(contentId, getAssignment().getReference(), getSubmitterId());
+ 					m_reviewScore = score;
+ 					M_log.debug(this + " getReviewScore CR returned a score of: " + score);
+ 					return score;
