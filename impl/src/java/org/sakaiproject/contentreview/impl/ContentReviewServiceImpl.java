@@ -39,6 +39,7 @@ import org.sakaiproject.contentreview.exception.TransientSubmissionException;
 import org.sakaiproject.contentreview.model.ContentReviewItem;
 import org.sakaiproject.contentreview.service.ContentReviewService;
 import org.sakaiproject.entity.api.ResourceProperties;
+import org.sakaiproject.exception.ServerOverloadException;
 import org.sakaiproject.site.api.Site;
 import org.sakaiproject.user.api.User;
 import org.sakaiproject.user.api.UserDirectoryService;
@@ -234,7 +235,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 			}
 			if(token != null){
 				//if token doesn't already exist in the cache, store it and set the date
-				if(!instructorSiteTokenCache.containsKey(context)){
+				if(instructor && !instructorSiteTokenCache.containsKey(context)){
 					instructorSiteTokenCache.put(context, new Object[]{token, new Date()});
 				}
 				//we have a request token instead of the secret so that a user can see it
@@ -382,7 +383,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 		
 	}
 
-	public void queueContent(String userId, String siteId, String assignmentReference, String contentId)
+	public void queueContent(String userId, String siteId, String assignmentReference, final String contentId)
 			throws QueueException {
 		/**
 		 * Example call:
@@ -393,56 +394,44 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 		 */
 		
 		try {
-			ContentResource res = contentHostingService.getResource(contentId);
+			final ContentResource res = contentHostingService.getResource(contentId);
 			if(res != null){
-				String userParam = res.getProperties().getProperty(ResourceProperties.PROP_CREATOR);
+				final String userParam = res.getProperties().getProperty(ResourceProperties.PROP_CREATOR);
 				String[] split = assignmentReference.split("/");
 				if(split.length == 5){
-					String contextParam = split[3];
-					String assignmentParam = split[4];
+					final String contextParam = split[3];
+					final String assignmentParam = split[4];
 					User u = userDirectoryService.getUser(userParam);
-					String userFirstNameParam = u.getFirstName();
-					String userLastNameParam = u.getLastName();
-					String userEmailParam = u.getEmail();
+					final String userFirstNameParam = u.getFirstName();
+					final String userLastNameParam = u.getLastName();
+					final String userEmailParam = u.getEmail();
 					//it doesn't matter, all users are learners in the Sakai Integration
-					String userRoleParam = PARAM_USER_ROLE_LEARNER;
+					final String userRoleParam = PARAM_USER_ROLE_LEARNER;
 					
-					
-					HttpClient client = HttpClientBuilder.create().build();
-					HttpPost post = new HttpPost(generateUrl(contextParam, assignmentParam, userParam));
-					try {
-
-						MultipartEntityBuilder builder = MultipartEntityBuilder.create();        
-					    builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
-					    ContentBody bin = new ByteArrayBody(res.getContent(), res.getProperties().getProperty(ResourceProperties.PROP_DISPLAY_NAME));
-					    builder.addPart(PARAM_FILE_DATA, bin);  
-					    builder.addTextBody(PARAM_CONSUMER, consumer);
-					    builder.addTextBody(PARAM_CONSUMER_SECRET, consumerSecret);
-					    builder.addTextBody(PARAM_USER_FIRST_NAME, userFirstNameParam);
-					    builder.addTextBody(PARAM_USER_LAST_NAME, userLastNameParam);
-					    builder.addTextBody(PARAM_USER_EMAIL, userEmailParam);
-					    builder.addTextBody(PARAM_USER_ROLE, userRoleParam);
-					    builder.addTextBody(PARAM_EXTERNAL_CONTENT_ID, contentId);
-					    final HttpEntity entity = builder.build();
-					    post.setEntity(entity);
-					    HttpResponse response = client.execute(post);        
-
-					    try{
-					    	String resultStr = getContent(response);
-					    	JSONObject responseObj = JSONObject.fromObject(resultStr);
-					    	if(responseObj != null && responseObj.containsKey("result")){
-					    		if(!"success".equals(responseObj.get("result"))){
-					    			throw new QueueException("result wasn't a success: " + resultStr);
-					    		}
-					    	}else{
-					    		throw new QueueException("result was either null, invalid json, or didn't have a result value: " + resultStr);
-					    	}
-					    }catch(Exception e){
-					    	throw new QueueException("Error while processing resonse result content", e);
-					    }
-					} catch (IOException e) {
-						throw new QueueException("Error while submitting paper: " + e.getMessage(), e);
-					}
+					new Thread(){
+						public void run() {
+							HttpClient client = HttpClientBuilder.create().build();
+							HttpPost post = new HttpPost(generateUrl(contextParam, assignmentParam, userParam));
+							try {
+								MultipartEntityBuilder builder = MultipartEntityBuilder.create();        
+							    builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
+							    ContentBody bin = new ByteArrayBody(res.getContent(), res.getProperties().getProperty(ResourceProperties.PROP_DISPLAY_NAME));
+							    builder.addPart(PARAM_FILE_DATA, bin);  
+							    builder.addTextBody(PARAM_CONSUMER, consumer);
+							    builder.addTextBody(PARAM_CONSUMER_SECRET, consumerSecret);
+							    builder.addTextBody(PARAM_USER_FIRST_NAME, userFirstNameParam);
+							    builder.addTextBody(PARAM_USER_LAST_NAME, userLastNameParam);
+							    builder.addTextBody(PARAM_USER_EMAIL, userEmailParam);
+							    builder.addTextBody(PARAM_USER_ROLE, userRoleParam);
+							    builder.addTextBody(PARAM_EXTERNAL_CONTENT_ID, contentId);
+							    final HttpEntity entity = builder.build();
+							    post.setEntity(entity);
+							    HttpResponse response = client.execute(post);
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+						}
+					}.start();
 				}
 			}
 		}catch(Exception e){
