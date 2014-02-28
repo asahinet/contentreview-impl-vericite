@@ -396,7 +396,10 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 		try {
 			final ContentResource res = contentHostingService.getResource(contentId);
 			if(res != null){
-				final String userParam = res.getProperties().getProperty(ResourceProperties.PROP_CREATOR);
+				final String userParam = userId;
+				if(userParam == null || "".equals(userParam.trim())){
+					res.getProperties().getProperty(ResourceProperties.PROP_CREATOR);
+				}
 				String[] split = assignmentReference.split("/");
 				if(split.length == 5){
 					final String contextParam = split[3];
