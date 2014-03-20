@@ -367,7 +367,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	}
 
 	public String getServiceName() {
-		return "Plagiarism Check";
+		return "VeriCite Plagiarism Service";
 	}
 
 	public boolean isAcceptableContent(ContentResource arg0) {
