@@ -91,9 +91,9 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	private static final int CONTENT_SCORE_CACHE_MINS = 5;
 	
 	public void init(){
-		serviceUrl = serverConfigurationService.getString("longsightPlagiarism.serviceUrl", "");
-		consumer = serverConfigurationService.getString("longsightPlagiarism.consumer", "");
-		consumerSecret = serverConfigurationService.getString("longsightPlagiarism.consumerSecret", "");
+		serviceUrl = serverConfigurationService.getString("vericite.serviceUrl", "");
+		consumer = serverConfigurationService.getString("vericite.consumer", "");
+		consumerSecret = serverConfigurationService.getString("vericite.consumerSecret", "");
 	}
 	
 	public boolean allowResubmission() {
@@ -134,7 +134,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	}
 
 	public String getIconUrlforScore(Long score) {
-		String urlBase = "/sakai-contentreview-tool-longsight/images/";
+		String urlBase = "/sakai-contentreview-tool-vericite/images/";
 		String suffix = ".png";
 
 		if (score.equals(Long.valueOf(0))) {
