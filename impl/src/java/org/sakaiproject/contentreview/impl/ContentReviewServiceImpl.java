@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -38,19 +39,24 @@ import org.sakaiproject.contentreview.exception.SubmissionException;
 import org.sakaiproject.contentreview.exception.TransientSubmissionException;
 import org.sakaiproject.contentreview.model.ContentReviewItem;
 import org.sakaiproject.contentreview.service.ContentReviewService;
+import org.sakaiproject.entity.api.Entity;
+import org.sakaiproject.entity.api.EntityManager;
+import org.sakaiproject.entity.api.EntityProducer;
+import org.sakaiproject.entity.api.Reference;
 import org.sakaiproject.entity.api.ResourceProperties;
-import org.sakaiproject.exception.ServerOverloadException;
 import org.sakaiproject.site.api.Site;
 import org.sakaiproject.user.api.User;
 import org.sakaiproject.user.api.UserDirectoryService;
+import org.sakaiproject.user.api.UserNotDefinedException;
 
 public class ContentReviewServiceImpl implements ContentReviewService {
 
 	private ServerConfigurationService serverConfigurationService;
 	private ContentHostingService contentHostingService;
 	private UserDirectoryService userDirectoryService;
-	
-	private static final String PARAM_CONSUMER = "consumer";
+	private EntityManager entityManager;
+
+    private static final String PARAM_CONSUMER = "consumer";
 	private static final String PARAM_CONSUMER_SECRET = "consumerSecret";
 	private static final String PARAM_TOKEN = "token";
 	private static final String PARAM_USER_FIRST_NAME = "userFirstName";
@@ -64,10 +70,11 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	private static final String PARAM_TOKEN_REQUEST = "tokenRequest";
 	private static final String PARAM_FILE_DATA = "filedata";
 	private static final String PARAM_EXTERNAL_CONTENT_ID = "externalContentId";
+	private static final String PARAM_ASSIGNMENT_TITLE = "assignmentTitle";
 	
 	private static final String ASN1_GRADE_PERM = "asn.grade";
 
-	
+
 	private String serviceUrl;
 	private String consumer;
 	private String consumerSecret;
@@ -78,8 +85,9 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	private static final int CACHE_EXPIRE_MINS = 20;
 	
 	//Caches the content review item scores
-	// Assignment -> {user -> Object{score, date}}
-	private Map<String, Map<String, Object[]>> contentScoreCache = new HashMap<String, Map<String, Object[]>>();
+	// Assignment -> {user -> {contentId - > Object{score, date}}}
+	private Map<String, Map<String, Map<String, Object[]>>> contentScoreCache = new HashMap<String, Map<String, Map<String, Object[]>>>();
+	private Map<String, String> assignmentTitleCache = new HashMap<String, String>();
 	private static final int CONTENT_SCORE_CACHE_MINS = 5;
 	
 	public void init(){
@@ -168,28 +176,39 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 		return null;
 	}
 
-	public String getReviewReport(String contentId) throws QueueException,
+	public String getReviewReport(String contentId, String assignmentRef) throws QueueException,
 			ReportException {
-		return getAccessUrl(contentId, false);
+		return getAccessUrl(contentId, assignmentRef, false);
 	}
 
-	public String getReviewReportInstructor(String contentId) throws QueueException,
+	public String getReviewReportInstructor(String contentId, String assignmentRef) throws QueueException,
 			ReportException {
 		/**
 		 * contentId: /attachment/04bad844-493c-45a1-95b4-af70129d54d1/Assignments/b9872422-fb24-4f85-abf5-2fe0e069b251/plag.docx
 		 */
-		return getAccessUrl(contentId, true);
+		return getAccessUrl(contentId, assignmentRef, true);
 	}
 
-	public String getReviewReportStudent(String contentId) throws QueueException,
+	public String getReviewReportStudent(String contentId, String assignmentRef) throws QueueException,
 			ReportException {
-		return getAccessUrl(contentId, false);
+		return getAccessUrl(contentId, assignmentRef, false);
 	}
 	
-	private String getAccessUrl(String contentId, boolean instructor) throws QueueException, ReportException {
-		String[] contentSplit = contentId.split("/");
-		if(contentSplit.length > 2){
-			String context = contentSplit[2];
+	private String getAccessUrl(String contentId, String assignmentRef, boolean instructor) throws QueueException, ReportException {
+		//assignmentRef: /assignment/a/f7d8c921-7d5a-4116-8781-9b61a7c92c43/cbb993da-ea12-4e74-bab1-20d16185a655
+		String context = null;
+		if(assignmentRef != null){
+			String[] assignmentRefSplit = assignmentRef.split("/");
+			if(assignmentRefSplit.length > 3){
+				context = assignmentRefSplit[3];
+			}
+		}else{
+			String[] contentSplit = contentId.split("/");
+			if(contentSplit.length > 2){
+				context = contentSplit[2];
+			}
+		}
+		if(context != null){
 			Map<String, String> params = new HashMap<String, String>();
 			params.put(PARAM_CONSUMER, consumer);
 			String token = null;
@@ -289,8 +308,9 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 				assignment = assignmentSplit[4];
 			}
 			if(assignment != null && contentScoreCache.containsKey(assignment) 
-					&& contentScoreCache.get(assignment).containsKey(userId)){
-				Object[] cacheItem = contentScoreCache.get(assignment).get(userId);
+					&& contentScoreCache.get(assignment).containsKey(userId) 
+					&& contentScoreCache.get(assignment).get(userId).containsKey(contentId)){
+				Object[] cacheItem = contentScoreCache.get(assignment).get(userId).get(contentId);
 				Calendar cal = Calendar.getInstance();
 				cal.setTime(new Date());
 				//subtract the exipre time
@@ -302,21 +322,27 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 					//token is expired, remove it
 					contentScoreCache.get(assignment).remove(userId);
 				}
+
 			}
 		}
 		
 		if(score == null){
 			//wasn't in cache
-			String[] contentSplit = contentId.split("/");
-			if(contentSplit.length > 2){
-				String context = contentSplit[2];
+			String[] assignmentRefSplit = assignmentRef.split("/");
+			if(assignmentRefSplit.length > 3){
+				String context = assignmentRefSplit[3];
 				Map<String, String> params = new HashMap<String, String>();
 				params.put(PARAM_CONSUMER, consumer);
 				params.put(PARAM_CONSUMER_SECRET, consumerSecret);
 				if(assignmentRef == null){
 					params.put(PARAM_EXTERNAL_CONTENT_ID, contentId);
+				}else if(assignment != null){
+					String assignmentTitle = getAssignmentTitle(assignmentRef);
+					if(assignmentTitle != null){
+						params.put(PARAM_ASSIGNMENT_TITLE, assignmentTitle);
+					}
 				}
-				//returns a map of {userId -> {assignment -> score}} for all users
+				//returns a map of {userId -> {assignmentId -> {contentId -> score}}} for all users
 				JSONObject results = getResults(generateUrl(context, assignment, null), params);
 				if(results != null){
 					for (Iterator iterator = results.keys(); iterator.hasNext();) {
@@ -325,13 +351,24 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 						if(userAssignments != null){
 							for (Iterator iterator2 = userAssignments.keys(); iterator2.hasNext();) {
 								String assignmentId = (String) iterator2.next();
-								score = userAssignments.getInt(assignmentId);
-								 Map<String, Object[]> cacheMap = contentScoreCache.get(assignmentId);
-								 if(cacheMap == null){
-									 cacheMap = new HashMap<String, Object[]>();
-								 }
-								cacheMap.put(userIdKey, new Object[]{score, new Date()});
-								contentScoreCache.put(assignmentId, cacheMap);
+								JSONObject userPapers = userAssignments.getJSONObject(assignmentId);
+								for(Iterator iterator3 = userPapers.keys(); iterator3.hasNext();){
+									String paperContentId = (String) iterator3.next();
+									if(contentId.equals(paperContentId)){
+										score = userPapers.getInt(paperContentId);
+									}
+									Map<String, Map<String, Object[]>> userCacheMap = contentScoreCache.get(assignmentId);
+									if(userCacheMap == null){
+										userCacheMap = new HashMap<String, Map<String, Object[]>>();
+									}
+									Map<String, Object[]> cacheMap = userCacheMap.get(userIdKey);
+									if(cacheMap == null){
+										cacheMap = new HashMap<String, Object[]>();
+									}
+									cacheMap.put(paperContentId, new Object[]{userPapers.getInt(paperContentId), new Date()});
+									userCacheMap.put(userIdKey, cacheMap);								
+									contentScoreCache.put(assignmentId, userCacheMap);
+								}
 							}
 						}
 					}
@@ -345,8 +382,9 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 						return score;
 					}else{
 						//grab the score from the map if it exists, if not, then there could have been an error:
-						if(contentScoreCache.containsKey(assignment) && contentScoreCache.get(assignment).containsKey(userId)){
-							return (Integer) contentScoreCache.get(assignment).get(userId)[0];
+						if(contentScoreCache.containsKey(assignment) && contentScoreCache.get(assignment).containsKey(userId)
+								&& contentScoreCache.get(assignment).get(userId).containsKey(contentId)){
+							return (Integer) contentScoreCache.get(assignment).get(userId).get(contentId)[0];
 						}else{
 							throw new QueueException("No report was found for contentId: " + contentId);		
 						}
@@ -382,64 +420,92 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 		// TODO Auto-generated method stub
 		
 	}
+	
+	public String getInlineTextId(String assignmentReference, String userId, long submissionTime){
+		return assignmentReference + "/" + userId + "/" + submissionTime;
+	}
 
+	public void queueInlineText(String userId, String siteId, String assignmentReference, String inlineText, long submissionTime) throws QueueException{
+		String inlineTitle = "Inline Submission";
+		//make the inlineText an html file to make VeriCite read it cleaner:
+		inlineText = "<html><body>" + inlineText + "</body></html>";
+		queue(userId, siteId, assignmentReference, getInlineTextId(assignmentReference, userId, submissionTime), inlineText.getBytes(), inlineTitle);
+	}
+	
 	public void queueContent(String userId, String siteId, String assignmentReference, final String contentId)
 			throws QueueException {
-		/**
-		 * Example call:
-		 * userId: null
-		 * siteId: null
-		 * assignmentReference: /assignment/a/04bad844-493c-45a1-95b4-af70129d54d1/fa40eac1-5396-4a71-9951-d7d64b8a7710
-		 * contentId: /attachment/04bad844-493c-45a1-95b4-af70129d54d1/Assignments/b9872422-fb24-4f85-abf5-2fe0e069b251/plag.docx
-		 */
-		
 		try {
 			final ContentResource res = contentHostingService.getResource(contentId);
 			if(res != null){
-				final String userParam = userId;
-				if(userParam == null || "".equals(userParam.trim())){
-					res.getProperties().getProperty(ResourceProperties.PROP_CREATOR);
+				if(userId == null || "".equals(userId.trim())){
+					userId = res.getProperties().getProperty(ResourceProperties.PROP_CREATOR);
 				}
-				String[] split = assignmentReference.split("/");
-				if(split.length == 5){
-					final String contextParam = split[3];
-					final String assignmentParam = split[4];
-					User u = userDirectoryService.getUser(userParam);
-					final String userFirstNameParam = u.getFirstName();
-					final String userLastNameParam = u.getLastName();
-					final String userEmailParam = u.getEmail();
-					//it doesn't matter, all users are learners in the Sakai Integration
-					final String userRoleParam = PARAM_USER_ROLE_LEARNER;
-					
-					new Thread(){
-						public void run() {
-							HttpClient client = HttpClientBuilder.create().build();
-							HttpPost post = new HttpPost(generateUrl(contextParam, assignmentParam, userParam));
-							try {
-								MultipartEntityBuilder builder = MultipartEntityBuilder.create();        
-							    builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
-							    ContentBody bin = new ByteArrayBody(res.getContent(), res.getProperties().getProperty(ResourceProperties.PROP_DISPLAY_NAME));
-							    builder.addPart(PARAM_FILE_DATA, bin);  
-							    builder.addTextBody(PARAM_CONSUMER, consumer);
-							    builder.addTextBody(PARAM_CONSUMER_SECRET, consumerSecret);
-							    builder.addTextBody(PARAM_USER_FIRST_NAME, userFirstNameParam);
-							    builder.addTextBody(PARAM_USER_LAST_NAME, userLastNameParam);
-							    builder.addTextBody(PARAM_USER_EMAIL, userEmailParam);
-							    builder.addTextBody(PARAM_USER_ROLE, userRoleParam);
-							    builder.addTextBody(PARAM_EXTERNAL_CONTENT_ID, contentId);
-							    final HttpEntity entity = builder.build();
-							    post.setEntity(entity);
-							    HttpResponse response = client.execute(post);
-							} catch (Exception e) {
-								e.printStackTrace();
-							}
-						}
-					}.start();
-				}
+				String fileName = res.getProperties().getProperty(ResourceProperties.PROP_DISPLAY_NAME);
+				queue(userId, siteId, assignmentReference, contentId, res.getContent(), fileName);
 			}
 		}catch(Exception e){
 			throw new QueueException(e);
 		}
+		
+	}
+	
+	private void queue(final String userId, String siteId, final String assignmentReference, final String contentId, final byte[] data, final String fileName){
+		/**
+		 * Example call:
+		 * userId: 124124124
+		 * siteId: 452351421
+		 * assignmentReference: /assignment/a/04bad844-493c-45a1-95b4-af70129d54d1/fa40eac1-5396-4a71-9951-d7d64b8a7710
+		 * contentId: /attachment/04bad844-493c-45a1-95b4-af70129d54d1/Assignments/b9872422-fb24-4f85-abf5-2fe0e069b251/plag.docx
+		 */
+		
+		
+				String[] split = assignmentReference.split("/");
+				if(split.length == 5){
+					final String contextParam = split[3];
+					final String assignmentParam = split[4];
+					User u;
+					try {
+						u = userDirectoryService.getUser(userId);
+						final String userFirstNameParam = u.getFirstName();
+						final String userLastNameParam = u.getLastName();
+						final String userEmailParam = u.getEmail();
+						//it doesn't matter, all users are learners in the Sakai Integration
+						final String userRoleParam = PARAM_USER_ROLE_LEARNER;
+
+						new Thread(){
+							public void run() {
+								HttpClient client = HttpClientBuilder.create().build();
+								HttpPost post = new HttpPost(generateUrl(contextParam, assignmentParam, userId));
+								try {
+									MultipartEntityBuilder builder = MultipartEntityBuilder.create();        
+									builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
+									ContentBody bin = new ByteArrayBody(data, fileName);
+									builder.addPart(PARAM_FILE_DATA, bin);  
+									builder.addTextBody(PARAM_CONSUMER, consumer);
+									builder.addTextBody(PARAM_CONSUMER_SECRET, consumerSecret);
+									builder.addTextBody(PARAM_USER_FIRST_NAME, userFirstNameParam);
+									builder.addTextBody(PARAM_USER_LAST_NAME, userLastNameParam);
+									builder.addTextBody(PARAM_USER_EMAIL, userEmailParam);
+									builder.addTextBody(PARAM_USER_ROLE, userRoleParam);
+									builder.addTextBody(PARAM_EXTERNAL_CONTENT_ID, contentId);
+									String assignmentTitle = getAssignmentTitle(assignmentReference);
+									if(assignmentTitle != null){
+										builder.addTextBody(PARAM_ASSIGNMENT_TITLE, assignmentTitle);
+									}
+									final HttpEntity entity = builder.build();
+									post.setEntity(entity);
+									HttpResponse response = client.execute(post);
+								} catch (Exception e) {
+									e.printStackTrace();
+								}
+							}
+						}.start();
+					} catch (UserNotDefinedException e1) {
+						// TODO Auto-generated catch block
+						e1.printStackTrace();
+					}
+				}
+	
 		
 	}
 
@@ -472,7 +538,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 			nameValuePairs.add(new BasicNameValuePair(entry.getKey(), entry.getValue()));
 		}
 		try {
-			post.setEntity(new UrlEncodedFormEntity(nameValuePairs));
+			post.setEntity(new UrlEncodedFormEntity(nameValuePairs, "UTF-8"));
 			HttpResponse response = client.execute(post);
 			return JSONObject.fromObject(getContent(response));
 		} catch (Exception e) {
@@ -510,6 +576,31 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	    return content.trim();
 	}
 	
+	
+	public boolean acceptInlineAndAllAttachments(){
+		return true;
+	}
+	
+	private String getAssignmentTitle(String assignmentRef){
+		if(assignmentTitleCache.containsKey(assignmentRef)){
+			return assignmentTitleCache.get(assignmentRef);
+		}else{
+			String assignmentTitle = null;
+			if (assignmentRef.startsWith("/assignment/")) {
+				try {
+					Reference ref = entityManager.newReference(assignmentRef);
+					EntityProducer ep = ref.getEntityProducer();
+					Entity ent = ep.getEntity(ref);
+					assignmentTitle = URLDecoder.decode(ent.getClass().getMethod("getTitle").invoke(ent).toString(),"UTF-8");
+					assignmentTitleCache.put(assignmentRef, assignmentTitle);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			}
+			return assignmentTitle;
+		}
+	}
+	
 	public ServerConfigurationService getServerConfigurationService() {
 		return serverConfigurationService;
 	}
@@ -533,5 +624,9 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 
 	public void setUserDirectoryService(UserDirectoryService userDirectoryService) {
 		this.userDirectoryService = userDirectoryService;
+	}
+	
+	public void setEntityManager(EntityManager en){
+		this.entityManager = en;
 	}
 }

@@ -10,6 +10,7 @@
 		 <property name="serverConfigurationService" ref="org.sakaiproject.component.api.ServerConfigurationService" />
 		 <property name="userDirectoryService" ref="org.sakaiproject.user.api.UserDirectoryService" />
 		 <property name="contentHostingService" ref="org.sakaiproject.content.api.ContentHostingService"/>
+		 <property name="entityManager" ref="org.sakaiproject.entity.api.EntityManager" />
 	</bean>
 
 	<bean
