@@ -591,8 +591,10 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 					Reference ref = entityManager.newReference(assignmentRef);
 					EntityProducer ep = ref.getEntityProducer();
 					Entity ent = ep.getEntity(ref);
-					assignmentTitle = URLDecoder.decode(ent.getClass().getMethod("getTitle").invoke(ent).toString(),"UTF-8");
-					assignmentTitleCache.put(assignmentRef, assignmentTitle);
+					if(ent != null){
+						assignmentTitle = URLDecoder.decode(ent.getClass().getMethod("getTitle").invoke(ent).toString(),"UTF-8");
+						assignmentTitleCache.put(assignmentRef, assignmentTitle);
+					}
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
