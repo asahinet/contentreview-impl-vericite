@@ -58,13 +58,13 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
  import java.io.*;
  import java.text.Normalizer;
  import java.text.NumberFormat;
-@@ -9950,104 +9952,241 @@
+@@ -9950,104 +9952,242 @@
  				return -2;
  			}
  
 -			if (m_submittedAttachments.isEmpty()) {
 +			if (m_submittedAttachments.isEmpty() 
-+					&& (contentReviewService.acceptInlineAndAllAttachments() && this.getSubmittedText() == null || "".equals(this.getSubmittedText().trim()))) {
++					&& (!contentReviewService.acceptInlineAndAllAttachments() || (contentReviewService.acceptInlineAndAllAttachments() && (this.getSubmittedText() == null || "".equals(this.getSubmittedText().trim()))))) {
  				M_log.debug(this + " getReviewScore No attachments submitted.");
  				return -2;
  			}
@@ -291,7 +291,8 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
  		public String getReviewReport() {
  //			 Code to get updated report if default
 -			if (m_submittedAttachments.isEmpty()) { 
-+			if (m_submittedAttachments.isEmpty() && (contentReviewService.acceptInlineAndAllAttachments() && this.getSubmittedText() == null || "".equals(this.getSubmittedText().trim()))){ 
++			if (m_submittedAttachments.isEmpty() 
++					&& (!contentReviewService.acceptInlineAndAllAttachments() || (contentReviewService.acceptInlineAndAllAttachments() && (this.getSubmittedText() == null || "".equals(this.getSubmittedText().trim()))))) { 
  				M_log.debug(this.getId() + " getReviewReport No attachments submitted."); 
  				return "Error";
  			}
@@ -366,7 +367,7 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
  			}
  			
  		}
-@@ -12070,15 +12209,36 @@
+@@ -12070,15 +12210,36 @@
  		
  		
  		
