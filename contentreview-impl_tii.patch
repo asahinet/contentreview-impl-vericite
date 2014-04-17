@@ -1,6 +1,6 @@
 Index: impl/src/java/org/sakaiproject/contentreview/impl/turnitin/TurnitinReviewServiceImpl.java
 ===================================================================
---- impl/src/java/org/sakaiproject/contentreview/impl/turnitin/TurnitinReviewServiceImpl.java	(revision 85567)
+--- impl/src/java/org/sakaiproject/contentreview/impl/turnitin/TurnitinReviewServiceImpl.java	(revision 86105)
 +++ impl/src/java/org/sakaiproject/contentreview/impl/turnitin/TurnitinReviewServiceImpl.java	(working copy)
 @@ -214,7 +214,7 @@
  
@@ -11,10 +11,56 @@ Index: impl/src/java/org/sakaiproject/contentreview/impl/turnitin/TurnitinReview
  		String suffix = ".gif";
  
  		if (score.equals(Long.valueOf(0))) {
-@@ -373,6 +373,11 @@
+@@ -239,7 +239,7 @@
+ 	 *
+ 	 * @see org.sakaiproject.contentreview.impl.hbm.BaseReviewServiceImpl#getReviewReportInstructor(java.lang.String)
+ 	 */
+-	public String getReviewReportInstructor(String contentId) throws QueueException, ReportException {
++	public String getReviewReportInstructor(String contentId, String assignmentRef) throws QueueException, ReportException {
+ 
+ 		Search search = new Search();
+ 		search.addRestriction(new Restriction("contentId", contentId));
+@@ -285,7 +285,7 @@
+ 		return turnitinConn.buildTurnitinURL(params);
+ 	}
+ 
+-	public String getReviewReportStudent(String contentId) throws QueueException, ReportException {
++	public String getReviewReportStudent(String contentId, String assignmentRef) throws QueueException, ReportException {
+ 
+ 		Search search = new Search();
+ 		search.addRestriction(new Restriction("contentId", contentId));
+@@ -342,13 +342,13 @@
+ 		return turnitinConn.buildTurnitinURL(params);
+ 	}
+ 
+-	public String getReviewReport(String contentId)
++	public String getReviewReport(String contentId, String assignmentRef)
+ 	throws QueueException, ReportException {
+ 
+ 		// first retrieve the record from the database to get the externalId of
+ 		// the content
+ 		log.warn("Deprecated Methog getReviewReport(String contentId) called");
+-		return this.getReviewReportInstructor(contentId);
++		return this.getReviewReportInstructor(contentId, assignmentRef);
+ 	}
+ 
+ private List<ContentReviewItem> getItemsByContentId(String contentId) {
+@@ -373,6 +373,23 @@
          return assignData;
      }
  
++    public void queueInlineText(String userId, String siteId, String assignmentReference, String inlineText, long submissionTime) throws QueueException{
++
++    }
++
++    public String getInlineTextId(String assignmentReference, String userId, long submissionTime){
++	return "";
++    } 	
++
++    public boolean acceptInlineAndAllAttachments(){
++	return false;
++    }
++
 +    public int getReviewScore(String contentId, String assignmentRef, String userId) throws QueueException,
 +                        ReportException, Exception {
 +	return getReviewScore(contentId);
@@ -23,22 +69,22 @@ Index: impl/src/java/org/sakaiproject/contentreview/impl/turnitin/TurnitinReview
      @Override
      public int getReviewScore(String contentId)throws QueueException, ReportException, Exception {
              ContentReviewItem item=null;
-Index: tool/pom.xml
+Index: pack/pom.xml
 ===================================================================
---- tool/pom.xml	(revision 85567)
-+++ tool/pom.xml	(working copy)
-@@ -18,7 +18,7 @@
+--- pack/pom.xml	(revision 86105)
++++ pack/pom.xml	(working copy)
+@@ -3,7 +3,7 @@
      <modelVersion>4.0.0</modelVersion>
-     <name>Turnitin WebApp</name>
+     <name>sakai-content-review-pack</name>
      <groupId>org.sakaiproject</groupId>
--    <artifactId>sakai-contentreview-tool</artifactId>
-+    <artifactId>sakai-contentreview-tool-tii</artifactId>
-     <description>
-         This project creates a WAR containing the Content Review tool for Sakai.
-     </description>
+-    <artifactId>sakai-content-review-pack</artifactId>
++    <artifactId>sakai-content-review-pack-tii</artifactId>
+     <organization>
+         <name>University of Cape Town</name>
+         <url>http://sakaiproject.org/</url>
 Index: pack/src/webapp/WEB-INF/components.xml
 ===================================================================
---- pack/src/webapp/WEB-INF/components.xml	(revision 85567)
+--- pack/src/webapp/WEB-INF/components.xml	(revision 86105)
 +++ pack/src/webapp/WEB-INF/components.xml	(working copy)
 @@ -20,7 +20,7 @@
  
@@ -85,16 +131,16 @@ Index: pack/src/webapp/WEB-INF/components.xml
     </bean>
  
     <bean id="org.sakaiproject.contentreview.impl.turnitin.TurnitinAccountConnection"
-Index: pack/pom.xml
+Index: tool/pom.xml
 ===================================================================
---- pack/pom.xml	(revision 85567)
-+++ pack/pom.xml	(working copy)
-@@ -3,7 +3,7 @@
+--- tool/pom.xml	(revision 86105)
++++ tool/pom.xml	(working copy)
+@@ -18,7 +18,7 @@
      <modelVersion>4.0.0</modelVersion>
-     <name>sakai-content-review-pack</name>
+     <name>Turnitin WebApp</name>
      <groupId>org.sakaiproject</groupId>
--    <artifactId>sakai-content-review-pack</artifactId>
-+    <artifactId>sakai-content-review-pack-tii</artifactId>
-     <organization>
-         <name>University of Cape Town</name>
-         <url>http://sakaiproject.org/</url>
+-    <artifactId>sakai-contentreview-tool</artifactId>
++    <artifactId>sakai-contentreview-tool-tii</artifactId>
+     <description>
+         This project creates a WAR containing the Content Review tool for Sakai.
+     </description>
