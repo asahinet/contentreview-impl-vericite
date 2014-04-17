@@ -504,7 +504,7 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
 +						</label>
 +					</div>
 +					<br/>
-+					#if($reviewServiceName.equals("Turnitin Service"))
++					#if($reviewServiceName.equals("Turnitin"))
  					$tlang.getString("content_review.note")
  					
  					$tlang.getString("review.submit.papers.repository")
