@@ -1,8 +1,18 @@
 Index: content-review-api/public/src/java/org/sakaiproject/contentreview/service/ContentReviewService.java
 ===================================================================
---- content-review-api/public/src/java/org/sakaiproject/contentreview/service/ContentReviewService.java	(revision 308301)
+--- content-review-api/public/src/java/org/sakaiproject/contentreview/service/ContentReviewService.java	(revision 308340)
 +++ content-review-api/public/src/java/org/sakaiproject/contentreview/service/ContentReviewService.java	(working copy)
-@@ -64,37 +64,49 @@
+@@ -51,8 +51,7 @@
+ 	 *  @param Reference to the content object that should be submitted
+ 	 *  
+ 	 */
+-	public void queueContent(String userId, String siteId, String taskId, String contentId)
+-	throws QueueException;
++	public void queueContent(String userId, String siteId, String assignmentReference, List<String> contentIds, String inlineText, long submissionTime) throws QueueException;
+ 	
+ 	/**
+ 	 *  Retrieve a score for a specific item
+@@ -64,37 +63,47 @@
  	  */
  	public int getReviewScore(String contentId)
  	throws QueueException, ReportException, Exception;
@@ -10,11 +20,9 @@ Index: content-review-api/public/src/java/org/sakaiproject/contentreview/service
 +	public int getReviewScore(String contentId, String assignmentRef, String userId) throws QueueException,
 +                        ReportException, Exception;
 +
-+	public void queueInlineText(String userId, String siteId, String assignmentReference, String inlineText, long submissionTime) throws QueueException;
-+
 +	public String getInlineTextId(String assignmentReference, String userId, long submissionTime);
  	
-+	public boolean acceptInlineAndAllAttachments();
++	public boolean acceptInlineAndMultipleAttachments();
 +
  	/**
  	 *  Get the URL of the report

@@ -7,6 +7,7 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
@@ -425,31 +426,36 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 		return assignmentReference + "/" + userId + "/" + submissionTime;
 	}
 
-	public void queueInlineText(String userId, String siteId, String assignmentReference, String inlineText, long submissionTime) throws QueueException{
-		String inlineTitle = "Inline Submission";
-		//make the inlineText an html file to make VeriCite read it cleaner:
-		inlineText = "<html><body>" + inlineText + "</body></html>";
-		queue(userId, siteId, assignmentReference, getInlineTextId(assignmentReference, userId, submissionTime), inlineText.getBytes(), inlineTitle);
-	}
-	
-	public void queueContent(String userId, String siteId, String assignmentReference, final String contentId)
-			throws QueueException {
-		try {
-			final ContentResource res = contentHostingService.getResource(contentId);
-			if(res != null){
-				if(userId == null || "".equals(userId.trim())){
-					userId = res.getProperties().getProperty(ResourceProperties.PROP_CREATOR);
-				}
-				String fileName = res.getProperties().getProperty(ResourceProperties.PROP_DISPLAY_NAME);
-				queue(userId, siteId, assignmentReference, contentId, res.getContent(), fileName);
-			}
-		}catch(Exception e){
-			throw new QueueException(e);
+	public void queueContent(String userId, String siteId, String assignmentReference, List<String> contentIds, String inlineText, long submissionTime) throws QueueException{
+		List<FileSubmission> fileSubmissions = new ArrayList<FileSubmission>();
+		if(inlineText != null && !"".equals(inlineText.trim())){
+			String inlineTitle = "Inline Submission";
+			//make the inlineText an html file to make VeriCite read it cleaner:
+			inlineText = "<html><body>" + inlineText + "</body></html>";
+			fileSubmissions.add(new FileSubmission(getInlineTextId(assignmentReference, userId, submissionTime), inlineTitle, inlineText.getBytes()));
 		}
-		
+		if(contentIds != null){
+			for(String contentId : contentIds){
+				try {
+					final ContentResource res = contentHostingService.getResource(contentId);
+					if(res != null){
+						if(userId == null || "".equals(userId.trim())){
+							userId = res.getProperties().getProperty(ResourceProperties.PROP_CREATOR);
+						}
+						String fileName = res.getProperties().getProperty(ResourceProperties.PROP_DISPLAY_NAME);
+						fileSubmissions.add(new FileSubmission(contentId, fileName, res.getContent()));
+					}
+				}catch(Exception e){
+					throw new QueueException(e);
+				}
+			}
+		}
+		if(fileSubmissions.size() > 0){
+			queue(userId, siteId, assignmentReference, fileSubmissions);
+		}
 	}
-	
-	private void queue(final String userId, String siteId, final String assignmentReference, final String contentId, final byte[] data, final String fileName){
+
+	private void queue(final String userId, String siteId, final String assignmentReference, final List<FileSubmission> fileSubmissions){
 		/**
 		 * Example call:
 		 * userId: 124124124
@@ -479,19 +485,26 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 								try {
 									MultipartEntityBuilder builder = MultipartEntityBuilder.create();        
 									builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
-									ContentBody bin = new ByteArrayBody(data, fileName);
-									builder.addPart(PARAM_FILE_DATA, bin);  
 									builder.addTextBody(PARAM_CONSUMER, consumer);
 									builder.addTextBody(PARAM_CONSUMER_SECRET, consumerSecret);
 									builder.addTextBody(PARAM_USER_FIRST_NAME, userFirstNameParam);
 									builder.addTextBody(PARAM_USER_LAST_NAME, userLastNameParam);
 									builder.addTextBody(PARAM_USER_EMAIL, userEmailParam);
 									builder.addTextBody(PARAM_USER_ROLE, userRoleParam);
-									builder.addTextBody(PARAM_EXTERNAL_CONTENT_ID, contentId);
 									String assignmentTitle = getAssignmentTitle(assignmentReference);
 									if(assignmentTitle != null){
 										builder.addTextBody(PARAM_ASSIGNMENT_TITLE, assignmentTitle);
 									}
+									if(fileSubmissions != null){
+										int i = 1;
+										for(FileSubmission f : fileSubmissions){
+											ContentBody bin = new ByteArrayBody(f.data, f.fileName);
+											builder.addPart(PARAM_FILE_DATA + i, bin);
+											builder.addTextBody(PARAM_EXTERNAL_CONTENT_ID + i, f.contentId);
+											i++;
+										}
+									}
+									
 									final HttpEntity entity = builder.build();
 									post.setEntity(entity);
 									HttpResponse response = client.execute(post);
@@ -577,7 +590,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	}
 	
 	
-	public boolean acceptInlineAndAllAttachments(){
+	public boolean acceptInlineAndMultipleAttachments(){
 		return true;
 	}
 	
@@ -630,5 +643,17 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	
 	public void setEntityManager(EntityManager en){
 		this.entityManager = en;
+	}
+	
+	private class FileSubmission{
+		public String contentId;
+		public byte[] data;
+		public String fileName;
+		
+		public FileSubmission(String contentId, String fileName, byte[] data){
+			this.contentId = contentId;
+			this.fileName = fileName;
+			this.data = data;
+		}
 	}
 }

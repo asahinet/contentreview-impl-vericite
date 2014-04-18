@@ -1,3 +1,24 @@
+Index: impl/src/java/org/sakaiproject/contentreview/impl/hbm/BaseReviewServiceImpl.java
+===================================================================
+--- impl/src/java/org/sakaiproject/contentreview/impl/hbm/BaseReviewServiceImpl.java	(revision 86105)
++++ impl/src/java/org/sakaiproject/contentreview/impl/hbm/BaseReviewServiceImpl.java	(working copy)
+@@ -70,10 +70,14 @@
+ 		this.siteAdvisor = crsa;
+ 	}
+ 	
+-	public void queueContent(String userId, String siteId, String taskId, String contentId)
++	public void queueContent(String userId, String siteId, String taskId, List<String> contentIds, String inlineText, long submissionTime)
+ 			throws QueueException {
++		if(contentIds == null || contentIds.size() < 1){
++			return;
++		}
++		String contentId = contentIds.get(0);
++
+ 		log.debug("Method called queueContent(" + userId + "," + siteId + "," + contentId + ")");
+-
+ 		if (userId == null) {
+ 			log.debug("Using current user");
+ 			userId = userDirectoryService.getCurrentUser().getId();
 Index: impl/src/java/org/sakaiproject/contentreview/impl/turnitin/TurnitinReviewServiceImpl.java
 ===================================================================
 --- impl/src/java/org/sakaiproject/contentreview/impl/turnitin/TurnitinReviewServiceImpl.java	(revision 86105)
@@ -45,19 +66,15 @@ Index: impl/src/java/org/sakaiproject/contentreview/impl/turnitin/TurnitinReview
  	}
  
  private List<ContentReviewItem> getItemsByContentId(String contentId) {
-@@ -373,6 +373,23 @@
+@@ -373,6 +373,19 @@
          return assignData;
      }
  
-+    public void queueInlineText(String userId, String siteId, String assignmentReference, String inlineText, long submissionTime) throws QueueException{
-+
-+    }
-+
 +    public String getInlineTextId(String assignmentReference, String userId, long submissionTime){
 +	return "";
 +    } 	
 +
-+    public boolean acceptInlineAndAllAttachments(){
++    public boolean acceptInlineAndMultipleAttachments(){
 +	return false;
 +    }
 +
@@ -131,6 +148,34 @@ Index: pack/src/webapp/WEB-INF/components.xml
     </bean>
  
     <bean id="org.sakaiproject.contentreview.impl.turnitin.TurnitinAccountConnection"
+Index: pom.xml
+===================================================================
+--- pom.xml	(revision 86105)
++++ pom.xml	(working copy)
+@@ -40,6 +40,7 @@
+ 
+ 	<properties>
+ 	  <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
++	  <contentreview.version>11-SNAPSHOT</contentreview.version>
+ 	</properties>
+ 	
+ 	<!-- handles the management of all related dependencies -->
+@@ -49,13 +50,13 @@
+ 			<dependency>
+ 				<groupId>org.sakaiproject.contentreview</groupId>
+ 				<artifactId>contentreview-model-api</artifactId>
+-				<version>2.9.1</version>
++				<version>${contentreview.version}</version>
+ 				<scope>provided</scope>
+ 			</dependency>
+ 			<dependency>
+ 				<groupId>org.sakaiproject.contentreview</groupId>
+ 				<artifactId>contentreview-service-api</artifactId>
+-				<version>2.9.1</version>
++				<version>${contentreview.version}</version>
+ 			</dependency>
+ 			<!-- internal dependencies -->
+ 			<dependency>
 Index: tool/pom.xml
 ===================================================================
 --- tool/pom.xml	(revision 86105)

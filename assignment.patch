@@ -1,6 +1,6 @@
 Index: assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmissionEdit.java
 ===================================================================
---- assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmissionEdit.java	(revision 308301)
+--- assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmissionEdit.java	(revision 308340)
 +++ assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmissionEdit.java	(working copy)
 @@ -264,5 +264,5 @@
  	 * Post attachments to the content review service
@@ -11,7 +11,7 @@ Index: assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSub
  }
 Index: assignment-bundles/resources/assignment.properties
 ===================================================================
---- assignment-bundles/resources/assignment.properties	(revision 308301)
+--- assignment-bundles/resources/assignment.properties	(revision 308340)
 +++ assignment-bundles/resources/assignment.properties	(working copy)
 @@ -667,7 +667,7 @@
  
@@ -40,7 +40,7 @@ Index: assignment-bundles/resources/assignment.properties
  
 Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java
 ===================================================================
---- assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java	(revision 308301)
+--- assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java	(revision 308340)
 +++ assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java	(working copy)
 @@ -22,6 +22,7 @@
  package org.sakaiproject.assignment.impl;
@@ -58,13 +58,13 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
  import java.io.*;
  import java.text.Normalizer;
  import java.text.NumberFormat;
-@@ -9950,104 +9952,242 @@
+@@ -9966,104 +9968,232 @@
  				return -2;
  			}
  
 -			if (m_submittedAttachments.isEmpty()) {
 +			if (m_submittedAttachments.isEmpty() 
-+					&& (!contentReviewService.acceptInlineAndAllAttachments() || (contentReviewService.acceptInlineAndAllAttachments() && (this.getSubmittedText() == null || "".equals(this.getSubmittedText().trim()))))) {
++					&& (!contentReviewService.acceptInlineAndMultipleAttachments() || (contentReviewService.acceptInlineAndMultipleAttachments() && (this.getSubmittedText() == null || "".equals(this.getSubmittedText().trim()))))) {
  				M_log.debug(this + " getReviewScore No attachments submitted.");
  				return -2;
  			}
@@ -75,7 +75,9 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
 -					M_log.debug("returning stored value of " + m_reviewScore);
 -					return m_reviewScore.intValue();
 -				}
-+				if(contentReviewService.acceptInlineAndAllAttachments()){
++				Set<String> requeueContentIds = new HashSet<String>();
++				String requeueInlineText = null;
++				if(contentReviewService.acceptInlineAndMultipleAttachments()){
 +					//check inline text first:
 +					boolean oneAccepted = false;
 +					//check inline if there is any data:
@@ -89,11 +91,7 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
 +							}
 +						}catch (QueueException cie) {
 +							//inline text can't be found, try to resubmit it:
-+							try {
-+								contentReviewService.queueInlineText(getSubmitterId(), this.getContext(), getAssignment().getReference(), this.getSubmittedText(), this.getTimeSubmitted().getTime());
-+							} catch (Exception e) {
-+								M_log.error(e.getMessage(), e);
-+							}
++							requeueInlineText = this.getSubmittedText();
 +						}
 +					}
  
@@ -120,11 +118,7 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
 +							}
 +						}catch (QueueException cie) {
 +							//try to resubmit attachment
-+							try {
-+								contentReviewService.queueContent(getSubmitterId(), this.getContext(), getAssignment().getReference(), contentResource.getId());
-+							} catch (QueueException e) {
-+								M_log.error(e.getMessage(), e);
-+							}
++							requeueContentIds.add(contentResource.getId());
 +						}
 +					}
 +					if(!oneAccepted){
@@ -135,7 +129,6 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
 +					//next get the scores of each content and show the highest score:
 +					int highestScore = 0;
 +					boolean oneScored = false;
-+					boolean anyQueued = false;
 +					if(this.getSubmittedText() != null && !"".equals(this.getSubmittedText().trim())){
 +						//inline text:
 +						try{
@@ -146,12 +139,7 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
 +							}
 +						}catch (QueueException cie) {
 +							//inline text can't be found, try to resubmit it:
-+							try {
-+								contentReviewService.queueInlineText(getSubmitterId(), this.getContext(), getAssignment().getReference(), this.getSubmittedText(), this.getTimeSubmitted().getTime());
-+								anyQueued = true;
-+							} catch (Exception e) {
-+								M_log.error(e.getMessage(), e);
-+							}
++							requeueInlineText = this.getSubmittedText();
 +						} catch (ReportException e) {
 +							M_log.error(e.getMessage(), e);
 +						} catch (Exception e) {
@@ -171,12 +159,7 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
 +								}
 +							}catch (QueueException cie) {
 +								//try to resubmit attachment
-+								try {
-+									contentReviewService.queueContent(getSubmitterId(), this.getContext(), getAssignment().getReference(), contentResource.getId());
-+									anyQueued = true;
-+								} catch (QueueException e) {
-+									M_log.error(e.getMessage(), e);
-+								}
++								requeueContentIds.add(contentResource.getId());
 +							} catch (ReportException e) {
 +								M_log.error(e.getMessage(), e);
 +							} catch (Exception e) {
@@ -184,11 +167,18 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
 +							}
 +						}
 +					}
-+					if(!anyQueued && !oneScored){
++					if(!oneScored && requeueContentIds.size() == 0 && requeueInlineText == null){
 +						//more likely service is down
 +						return -2;
 +					}
- 
++					if(requeueContentIds.size() > 0 || requeueInlineText != null){
++						try {
++							contentReviewService.queueContent(getSubmitterId(), this.getContext(), getAssignment().getReference(), new ArrayList<String>(requeueContentIds), requeueInlineText, getTimeSubmitted().getTime());
++						} catch (QueueException e) {
++							M_log.warn(" getReviewScore multiple queue: Unable to queue content with content review Service: " + e.getMessage());
++						}
++					}
++					
 +					return highestScore;
 +				}else{
 +					//single file upload
@@ -205,25 +195,30 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
 +						return -2;
 +					}
  
--				try {
--					//we need to find the first attachment the CR will accept
--					String contentId = cr.getId();
--					M_log.debug(this + " getReviewScore checking for score for content: " + contentId);
 +					try {
 +						//we need to find the first attachment the CR will accept
 +						String contentId = cr.getId();
 +						M_log.debug(this + " getReviewScore checking for score for content: " + contentId);
+ 
+-				try {
+-					//we need to find the first attachment the CR will accept
+-					String contentId = cr.getId();
+-					M_log.debug(this + " getReviewScore checking for score for content: " + contentId);
++						Long status = contentReviewService.getReviewStatus(contentId);
++						if (status != null && (status.equals(ContentReviewItem.NOT_SUBMITTED_CODE) || status.equals(ContentReviewItem.SUBMITTED_AWAITING_REPORT_CODE)))  {
++							M_log.debug(this + " getReviewStatus returned a status of: " + status);
++							return -2;
++						}
  
 -                    Long status = contentReviewService.getReviewStatus(contentId);
 -                    if (status != null && (status.equals(ContentReviewItem.NOT_SUBMITTED_CODE) || status.equals(ContentReviewItem.SUBMITTED_AWAITING_REPORT_CODE)))  {
 -                        M_log.debug(this + " getReviewStatus returned a status of: " + status);
 -                        return -2;
 -                    }
-+						Long status = contentReviewService.getReviewStatus(contentId);
-+						if (status != null && (status.equals(ContentReviewItem.NOT_SUBMITTED_CODE) || status.equals(ContentReviewItem.SUBMITTED_AWAITING_REPORT_CODE)))  {
-+							M_log.debug(this + " getReviewStatus returned a status of: " + status);
-+							return -2;
-+						}
++						int score = contentReviewService.getReviewScore(contentId, getAssignment().getReference(), getSubmitterId());
++						m_reviewScore = score;
++						M_log.debug(this + " getReviewScore CR returned a score of: " + score);
++						return score;
  
 -					int score = contentReviewService.getReviewScore(contentId);
 -					m_reviewScore = score;
@@ -235,11 +230,6 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
 -					//should we add the item
 -					try {
 -						
-+						int score = contentReviewService.getReviewScore(contentId, getAssignment().getReference(), getSubmitterId());
-+						m_reviewScore = score;
-+						M_log.debug(this + " getReviewScore CR returned a score of: " + score);
-+						return score;
-+
 +					}catch (QueueException cie) {
 +						//should we add the item
 +						try {
@@ -248,8 +238,9 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
  							String contentId = cr.getId();
  							String userId = this.getSubmitterId();
 -                                                        try {
+-								contentReviewService.queueContent(userId, null, getAssignment().getReference(), contentId);
 +							try {
- 								contentReviewService.queueContent(userId, null, getAssignment().getReference(), contentId);
++								contentReviewService.queueContent(userId, null, getAssignment().getReference(), Arrays.asList(contentId), null, getTimeSubmitted().getTime());
  							}
  							catch (QueueException qe) {
  								M_log.warn(" getReviewScore Unable to queue content with content review Service: " + qe.getMessage());
@@ -292,14 +283,14 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
  //			 Code to get updated report if default
 -			if (m_submittedAttachments.isEmpty()) { 
 +			if (m_submittedAttachments.isEmpty() 
-+					&& (!contentReviewService.acceptInlineAndAllAttachments() || (contentReviewService.acceptInlineAndAllAttachments() && (this.getSubmittedText() == null || "".equals(this.getSubmittedText().trim()))))) { 
++					&& (!contentReviewService.acceptInlineAndMultipleAttachments() || (contentReviewService.acceptInlineAndMultipleAttachments() && (this.getSubmittedText() == null || "".equals(this.getSubmittedText().trim()))))) { 
  				M_log.debug(this.getId() + " getReviewReport No attachments submitted."); 
  				return "Error";
  			}
  			else
  			{
 -				try {
-+				if(contentReviewService.acceptInlineAndAllAttachments()){
++				if(contentReviewService.acceptInlineAndMultipleAttachments()){
 +					//sent it the first acceptable attachment (or inline text id) so that the
 +					//service can look up information based on that
 +					String contentId = null;
@@ -367,7 +358,7 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
  			}
  			
  		}
-@@ -12070,15 +12210,36 @@
+@@ -12086,15 +12216,34 @@
  		
  		
  		
@@ -383,17 +374,14 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
  				{
 -					contentReviewService.queueContent(null, null, ass.getReference(), cr.getId());
 +					String userId = this.getSubmitterId();
-+					if(contentReviewService.acceptInlineAndAllAttachments()){
-+						//first submit inline text
-+						if(inlineText != null && !"".equals(inlineText.trim())){
-+							contentReviewService.queueInlineText(userId, this.getContext(), ass.getReference(), inlineText, this.getTimeSubmitted().getTime());
-+						}
++					List<String> contentIds = new ArrayList<String>();
++					if(contentReviewService.acceptInlineAndMultipleAttachments()){
 +						for( int i =0; i < attachments.size();i++ ) { 
 +							Reference attachment = (Reference)attachments.get(i);
 +							try {
 +								ContentResource res = m_contentHostingService.getResource(attachment.getId());
 +								if(contentReviewService.isAcceptableContent(res)){
-+									contentReviewService.queueContent(userId, this.getContext(), ass.getReference(), res.getId());
++									contentIds.add(res.getId());
 +								}
 +							}catch(Exception e){
 +								M_log.warn(e.getMessage(), e);
@@ -403,25 +391,26 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
 +						//single file upload
 +						ContentResource cr = getFirstAcceptableAttachement(attachments);
 +						if(cr != null){
-+							contentReviewService.queueContent(userId, null, ass.getReference(), cr.getId());
++							contentIds.add(cr.getId());
 +						}
 +					}
++					contentReviewService.queueContent(userId, this.getContext(), ass.getReference(), contentIds, inlineText, this.getTimeSubmitted().getTime());
  				}
  				else
  				{
 Index: assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java
 ===================================================================
---- assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java	(revision 308301)
+--- assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java	(revision 308340)
 +++ assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java	(working copy)
 @@ -933,7 +933,12 @@
  		// Check whether content review service is enabled, present and enabled for this site
  		getContentReviewService();
  		context.put("allowReviewService", allowReviewService && contentReviewService != null && contentReviewService.isSiteAcceptable(s));
 -
-+		if(contentReviewService != null && contentReviewService.acceptInlineAndAllAttachments()){
-+			context.put("acceptInlineAndAllAttachments", true);
++		if(contentReviewService != null && contentReviewService.acceptInlineAndMultipleAttachments()){
++			context.put("acceptInlineAndMultipleAttachments", true);
 +		}else{
-+			context.put("acceptInlineAndAllAttachments", false);
++			context.put("acceptInlineAndMultipleAttachments", false);
 +		}
 +	
  		if (allowReviewService && contentReviewService != null && contentReviewService.isSiteAcceptable(s)) {
@@ -433,7 +422,7 @@ Index: assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/Assignment
  							if (a.getContent().getAllowReviewService()) {
 -								if (!attachments.isEmpty()) { 
 -									sEdit.postAttachment(attachments);
-+								if (!attachments.isEmpty() || (contentReviewService.acceptInlineAndAllAttachments() && sEdit.getSubmittedText() != null && !"".equals(sEdit.getSubmittedText().trim()))) { 
++								if (!attachments.isEmpty() || (contentReviewService.acceptInlineAndMultipleAttachments() && sEdit.getSubmittedText() != null && !"".equals(sEdit.getSubmittedText().trim()))) { 
 +									sEdit.postAssignmentToContentReviewService(sEdit.getSubmittedText(), attachments);
  								}
  							}
@@ -449,7 +438,7 @@ Index: assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/Assignment
  								Iterator it = attachments.iterator();
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm	(revision 308301)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm	(revision 308340)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm	(working copy)
 @@ -197,7 +197,7 @@
  				#if($allowReviewService && $assignment.getContent().AllowReviewService && $assignment.getContent().AllowStudentViewReport)
@@ -462,7 +451,7 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  							#if (!$submission)
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(revision 308301)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(revision 308340)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(working copy)
 @@ -554,7 +554,7 @@
  					#if ($allowReviewService && $assignment.getContent().AllowReviewService)
@@ -475,7 +464,7 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  										<img id="sort_ascending_review" src = "#imageLink("sakai/sortascending.gif")" border="0" alt="$tlang.getString("gen.sorasc")" /> 
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(revision 308301)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(revision 308340)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(working copy)
 @@ -603,12 +603,29 @@
  						$reviewServiceUse
@@ -536,7 +525,7 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  		#if ($!withGrade && $!withGradebook)
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm	(revision 308301)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm	(revision 308340)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm	(working copy)
 @@ -136,7 +136,7 @@
  				#if($allowReviewService && $assignment.getContent().AllowReviewService && $assignment.getContent().AllowStudentViewReport)
@@ -549,7 +538,7 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_vi
  							#if (!$submission)
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm	(revision 308301)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm	(revision 308340)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm	(working copy)
 @@ -297,7 +297,7 @@
  				#if($!submitted && $!timeSubmitted && $allowReviewService && $assignment.getContent().AllowReviewService && $assignment.getContent().AllowStudentViewReport)
