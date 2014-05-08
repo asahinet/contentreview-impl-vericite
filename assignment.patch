@@ -477,7 +477,7 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  					<div id="reviewServiceOptions" style="display:none" class="indnt3">
  				#end
 -				
-+					#if($acceptInlineAndAllAttachments)
++					#if($acceptInlineAndMultipleAttachments)
 +						$tlang.getString("review.acceptInlineAndAllAttachments")
 +					#else
 +						$tlang.getString("review.not.acceptInlineAndAllAttachments")
