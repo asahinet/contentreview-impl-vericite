@@ -1,0 +1,69 @@
+diff --git a/impl/pom.xml b/impl/pom.xml
+index e39cb98..84890ac 100644
+--- a/impl/pom.xml
++++ b/impl/pom.xml
+@@ -44,9 +44,9 @@
+                                 <version>2.4</version>
+                         </dependency>
+         <dependency>
+-            <groupId>org.sakaiproject.assignment</groupId>
++            <groupId>org.sakaiproject</groupId>
+             <artifactId>sakai-assignment-api</artifactId>
+-        </dependency>
++	</dependency>
+ 	<dependency>
+ 		<groupId>org.apache.httpcomponents</groupId>
+ 		<artifactId>httpclient</artifactId>
+diff --git a/pom.xml b/pom.xml
+index 299e3a2..efa164f 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -6,14 +6,13 @@
+ 	<artifactId>content-review-impl-base</artifactId>
+ 	<version>0.9-SNAPSHOT</version>
+ 	<packaging>pom</packaging>
+-	
++
+     <parent>
+-        <groupId>org.sakaiproject</groupId>
+-        <artifactId>master</artifactId>
+-        <version>11-SNAPSHOT</version>
+-        <relativePath>../master/pom.xml</relativePath>
++	<artifactId>base</artifactId>
++	<groupId>org.sakaiproject</groupId>
++	<version>2.8-SNAPSHOT</version>
++	<relativePath>../../pom.xml</relativePath>
+     </parent>
+-
+ 	<modules>
+ 		<module>impl</module>
+ 		<module>pack</module>
+@@ -25,6 +24,28 @@
+ 	
+ 	<dependencyManagement>
+ 		<dependencies>
++		<dependency>
++			<groupId>org.sakaiproject.contentreview</groupId>
++			<artifactId>contentreview-model-api</artifactId>
++			<version>2.8.9-SNAPSHOT</version>
++			<scope>provided</scope>
++		</dependency>
++		<dependency>
++			<groupId>org.sakaiproject.contentreview</groupId>
++			<artifactId>contentreview-service-api</artifactId>
++			<version>2.8.9-SNAPSHOT</version>
++		</dependency>
++		<dependency>
++			<groupId>org.sakaiproject.kernel</groupId>
++			<artifactId>sakai-kernel-api</artifactId>
++			<version>1.2.9</version>
++		</dependency>
++		<dependency>
++			<groupId>org.sakaiproject.kernel</groupId>
++			<artifactId>sakai-component-manager</artifactId>
++			<version>1.2.9</version>
++		</dependency>
++
+ 		  <!-- the API is seperately versioned from the impl -->
+ 		  <dependency>
+ 			  <groupId>net.sf.json-lib</groupId>
