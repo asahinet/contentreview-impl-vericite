@@ -1,6 +1,6 @@
 Index: assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmissionEdit.java
 ===================================================================
---- assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmissionEdit.java	(revision 309629)
+--- assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmissionEdit.java	(revision 309635)
 +++ assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmissionEdit.java	(working copy)
 @@ -264,5 +264,5 @@
  	 * Post attachments to the content review service
@@ -11,7 +11,7 @@ Index: assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSub
  }
 Index: assignment-bundles/resources/assignment.properties
 ===================================================================
---- assignment-bundles/resources/assignment.properties	(revision 309629)
+--- assignment-bundles/resources/assignment.properties	(revision 309635)
 +++ assignment-bundles/resources/assignment.properties	(working copy)
 @@ -666,7 +666,7 @@
  
@@ -40,7 +40,7 @@ Index: assignment-bundles/resources/assignment.properties
  
 Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java
 ===================================================================
---- assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java	(revision 309629)
+--- assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java	(revision 309635)
 +++ assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java	(working copy)
 @@ -22,6 +22,7 @@
  package org.sakaiproject.assignment.impl;
@@ -400,7 +400,7 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
  				{
 Index: assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java
 ===================================================================
---- assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java	(revision 309629)
+--- assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java	(revision 309635)
 +++ assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java	(working copy)
 @@ -927,7 +927,12 @@
  		// Check whether content review service is enabled, present and enabled for this site
@@ -438,7 +438,7 @@ Index: assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/Assignment
  								Iterator it = attachments.iterator();
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm	(revision 309629)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm	(revision 309635)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm	(working copy)
 @@ -197,7 +197,7 @@
  				#if($allowReviewService && $assignment.getContent().AllowReviewService && $assignment.getContent().AllowStudentViewReport)
@@ -451,7 +451,7 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  							#if (!$submission)
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(revision 309629)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(revision 309635)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(working copy)
 @@ -554,7 +554,7 @@
  					#if ($allowReviewService && $assignment.getContent().AllowReviewService)
@@ -462,9 +462,28 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  								#if ($sortedBy.equals($!sort_submitReview)) 
  									#if ($sortedAsc.equals("true")) 
  										<img id="sort_ascending_review" src = "#imageLink("sakai/sortascending.gif")" border="0" alt="$tlang.getString("gen.sorasc")" /> 
+@@ -750,13 +750,14 @@
+ 							#end	
+ 							#if ($allowReviewService && $assignment.getContent().AllowReviewService)
+ 								<td headers="reviewService">
+-								 #if ($submission.getReviewScore() == -1)
++								#set ($reviewScore = $submission.getReviewScore())
++								 #if ($reviewScore == -1)
+                                      <div class="alertMessage" >$!submission.getReviewError()</div>
+-                                 #elseif ($submission.getReviewScore() == -2)
++                                 #elseif ($reviewScore == -2)
+                                      $tlang.getString("review.noreport")  
+ 								 #else
+-								 <a href="$submission.getReviewReport()" target="_blank" title="View report: score $submission.getReviewScore()">
+-								 <img src="$submission.getReviewIconUrl()" alt="$submission.getReviewScore()">
++								 <a href="$submission.getReviewReport()" target="_blank" title="View report: score $reviewScore">
++								 <img src="$submission.getReviewIconUrl()" alt="$reviewScore">
+ 								 </a>
+ 								 #end
+ 									
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(revision 309629)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(revision 309635)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(working copy)
 @@ -603,12 +603,29 @@
  						$reviewServiceUse
@@ -525,7 +544,7 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  		#if ($!withGrade && $!withGradebook)
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm	(revision 309629)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm	(revision 309635)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm	(working copy)
 @@ -136,7 +136,7 @@
  				#if($allowReviewService && $assignment.getContent().AllowReviewService && $assignment.getContent().AllowStudentViewReport)
@@ -538,7 +557,7 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_vi
  							#if (!$submission)
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm	(revision 309629)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm	(revision 309635)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm	(working copy)
 @@ -297,7 +297,7 @@
  				#if($!submitted && $!timeSubmitted && $allowReviewService && $assignment.getContent().AllowReviewService && $assignment.getContent().AllowStudentViewReport)
