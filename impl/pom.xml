@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <name>VeriCite ContentReview IMPL</name>
     <groupId>org.sakaiproject.contentreview</groupId>
-    <artifactId>sakai-contentreview-impl</artifactId>
+    <artifactId>sakai-contentreview-impl-vericite</artifactId>
     <organization>
         <name>Sakai Project</name>
         <url>http://www.sakaiproject.org/</url>
@@ -12,7 +12,7 @@
 
     <parent>
         <groupId>org.sakaiproject.contentreview</groupId>
-        <artifactId>content-review-impl-base</artifactId>
+        <artifactId>content-review-impl-base-vericite</artifactId>
         <version>0.9-SNAPSHOT</version>
         <relativePath>../pom.xml</relativePath>
     </parent>

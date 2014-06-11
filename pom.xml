@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<name>Sakai Content Review - VeriCite</name>
 	<groupId>org.sakaiproject.contentreview</groupId>
-	<artifactId>content-review-impl-base</artifactId>
+	<artifactId>content-review-impl-base-vericite</artifactId>
 	<version>0.9-SNAPSHOT</version>
 	<packaging>pom</packaging>
 	

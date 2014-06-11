@@ -7,7 +7,7 @@
     <packaging>war</packaging>
     <parent>
         <groupId>org.sakaiproject.contentreview</groupId>
-        <artifactId>content-review-impl-base</artifactId>
+        <artifactId>content-review-impl-base-vericite</artifactId>
         <version>0.9-SNAPSHOT</version>
                 <relativePath>../pom.xml</relativePath>
     </parent>

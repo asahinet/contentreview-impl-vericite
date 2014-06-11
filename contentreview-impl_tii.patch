@@ -1,6 +1,63 @@
+Index: ddl/pom.xml
+===================================================================
+--- ddl/pom.xml	(revision 86574)
++++ ddl/pom.xml	(working copy)
+@@ -10,7 +10,7 @@
+ 
+     <!-- this should refer to your project base POM (remove if not needed) -->
+     <parent>
+-        <artifactId>content-review-impl-base</artifactId>
++        <artifactId>content-review-impl-base-tii</artifactId>
+         <groupId>org.sakaiproject.contentreview</groupId>
+         <version>0.1-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+@@ -50,7 +50,7 @@
+ 
+         <dependency>
+             <groupId>org.sakaiproject.contentreview</groupId>
+-            <artifactId>sakai-contentreview-impl</artifactId>
++            <artifactId>sakai-contentreview-impl-tii</artifactId>
+         </dependency>
+ 
+     </dependencies>
+Index: hbm/pom.xml
+===================================================================
+--- hbm/pom.xml	(revision 86574)
++++ hbm/pom.xml	(working copy)
+@@ -17,7 +17,7 @@
+     </properties>
+ 
+     <parent>
+-        <artifactId>content-review-impl-base</artifactId>
++        <artifactId>content-review-impl-base-tii</artifactId>
+         <groupId>org.sakaiproject.contentreview</groupId>
+         <version>0.9-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+Index: impl/pom.xml
+===================================================================
+--- impl/pom.xml	(revision 86574)
++++ impl/pom.xml	(working copy)
+@@ -3,7 +3,7 @@
+     <modelVersion>4.0.0</modelVersion>
+     <name>Turnitin ContentReview IMPL</name>
+     <groupId>org.sakaiproject.contentreview</groupId>
+-    <artifactId>sakai-contentreview-impl</artifactId>
++    <artifactId>sakai-contentreview-impl-tii</artifactId>
+     <organization>
+         <name>Sakai Project</name>
+         <url>http://www.sakaiproject.org/</url>
+@@ -13,7 +13,7 @@
+     <packaging>jar</packaging>
+ 
+     <parent>
+-        <artifactId>content-review-impl-base</artifactId>
++        <artifactId>content-review-impl-base-tii</artifactId>
+         <groupId>org.sakaiproject.contentreview</groupId>
+         <version>0.9-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
 Index: impl/src/java/org/sakaiproject/contentreview/impl/hbm/BaseReviewServiceImpl.java
 ===================================================================
---- impl/src/java/org/sakaiproject/contentreview/impl/hbm/BaseReviewServiceImpl.java	(revision 86105)
+--- impl/src/java/org/sakaiproject/contentreview/impl/hbm/BaseReviewServiceImpl.java	(revision 86574)
 +++ impl/src/java/org/sakaiproject/contentreview/impl/hbm/BaseReviewServiceImpl.java	(working copy)
 @@ -70,10 +70,14 @@
  		this.siteAdvisor = crsa;
@@ -21,7 +78,7 @@ Index: impl/src/java/org/sakaiproject/contentreview/impl/hbm/BaseReviewServiceIm
  			userId = userDirectoryService.getCurrentUser().getId();
 Index: impl/src/java/org/sakaiproject/contentreview/impl/turnitin/TurnitinReviewServiceImpl.java
 ===================================================================
---- impl/src/java/org/sakaiproject/contentreview/impl/turnitin/TurnitinReviewServiceImpl.java	(revision 86105)
+--- impl/src/java/org/sakaiproject/contentreview/impl/turnitin/TurnitinReviewServiceImpl.java	(revision 86574)
 +++ impl/src/java/org/sakaiproject/contentreview/impl/turnitin/TurnitinReviewServiceImpl.java	(working copy)
 @@ -214,7 +214,7 @@
  
@@ -88,7 +145,7 @@ Index: impl/src/java/org/sakaiproject/contentreview/impl/turnitin/TurnitinReview
              ContentReviewItem item=null;
 Index: pack/pom.xml
 ===================================================================
---- pack/pom.xml	(revision 86105)
+--- pack/pom.xml	(revision 86574)
 +++ pack/pom.xml	(working copy)
 @@ -3,7 +3,7 @@
      <modelVersion>4.0.0</modelVersion>
@@ -99,9 +156,27 @@ Index: pack/pom.xml
      <organization>
          <name>University of Cape Town</name>
          <url>http://sakaiproject.org/</url>
+@@ -15,7 +15,7 @@
+     </properties>
+ 
+     <parent>
+-        <artifactId>content-review-impl-base</artifactId>
++        <artifactId>content-review-impl-base-tii</artifactId>
+         <groupId>org.sakaiproject.contentreview</groupId>
+         <version>0.9-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+@@ -25,7 +25,7 @@
+ 
+         <dependency>
+             <groupId>org.sakaiproject.contentreview</groupId>
+-            <artifactId>sakai-contentreview-impl</artifactId>
++            <artifactId>sakai-contentreview-impl-tii</artifactId>
+             <scope>runtime</scope>
+         </dependency>
+ 
 Index: pack/src/webapp/WEB-INF/components.xml
 ===================================================================
---- pack/src/webapp/WEB-INF/components.xml	(revision 86105)
+--- pack/src/webapp/WEB-INF/components.xml	(revision 86574)
 +++ pack/src/webapp/WEB-INF/components.xml	(working copy)
 @@ -20,7 +20,7 @@
  
@@ -150,8 +225,17 @@ Index: pack/src/webapp/WEB-INF/components.xml
     <bean id="org.sakaiproject.contentreview.impl.turnitin.TurnitinAccountConnection"
 Index: pom.xml
 ===================================================================
---- pom.xml	(revision 86105)
+--- pom.xml	(revision 86574)
 +++ pom.xml	(working copy)
+@@ -3,7 +3,7 @@
+ 	<modelVersion>4.0.0</modelVersion>
+ 	<name>Sakai Content Review - Turnitin</name>
+ 	<groupId>org.sakaiproject.contentreview</groupId>
+-	<artifactId>content-review-impl-base</artifactId>
++	<artifactId>content-review-impl-base-tii</artifactId>
+ 	<version>0.9-SNAPSHOT</version>
+ 	<packaging>pom</packaging>
+ 	<!--
 @@ -40,6 +40,7 @@
  
  	<properties>
@@ -160,7 +244,7 @@ Index: pom.xml
  	</properties>
  	
  	<!-- handles the management of all related dependencies -->
-@@ -49,13 +50,13 @@
+@@ -49,18 +50,18 @@
  			<dependency>
  				<groupId>org.sakaiproject.contentreview</groupId>
  				<artifactId>contentreview-model-api</artifactId>
@@ -176,9 +260,28 @@ Index: pom.xml
  			</dependency>
  			<!-- internal dependencies -->
  			<dependency>
+ 				<groupId>org.sakaiproject.contentreview</groupId>
+-				<artifactId>sakai-contentreview-impl</artifactId>
++				<artifactId>sakai-contentreview-impl-tii</artifactId>
+ 				<version>0.9-SNAPSHOT</version><!--turnitin.version-->
+ 			</dependency>
+ 			<dependency>
+Index: scheduler-jobs/pom.xml
+===================================================================
+--- scheduler-jobs/pom.xml	(revision 86574)
++++ scheduler-jobs/pom.xml	(working copy)
+@@ -2,7 +2,7 @@
+ <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+ 	<modelVersion>4.0.0</modelVersion>
+ 	<parent>
+-		<artifactId>content-review-impl-base</artifactId>
++		<artifactId>content-review-impl-base-tii</artifactId>
+ 		<groupId>org.sakaiproject.contentreview</groupId>
+ 		<version>0.9-SNAPSHOT</version>
+ 		<relativePath>../pom.xml</relativePath>
 Index: tool/pom.xml
 ===================================================================
---- tool/pom.xml	(revision 86105)
+--- tool/pom.xml	(revision 86574)
 +++ tool/pom.xml	(working copy)
 @@ -18,7 +18,7 @@
      <modelVersion>4.0.0</modelVersion>
@@ -189,3 +292,12 @@ Index: tool/pom.xml
      <description>
          This project creates a WAR containing the Content Review tool for Sakai.
      </description>
+@@ -26,7 +26,7 @@
+ 
+ 
+     <parent>
+-        <artifactId>content-review-impl-base</artifactId>
++        <artifactId>content-review-impl-base-tii</artifactId>
+         <groupId>org.sakaiproject.contentreview</groupId>
+         <version>0.9-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
