@@ -246,11 +246,17 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 				try {
 					results = getResults(url, params);
 					if(results != null){
-						token = results.getString(PARAM_TOKEN);
+						//check for error message:
+						String errorMsg = getErrorMessage(results);
+						if(errorMsg == null){
+							token = results.getString(PARAM_TOKEN);
+						}else{
+							throw new ReportException(errorMsg);
+						}
 					}
 
 				} catch (Exception e) {
-					throw new ReportException(e);
+					throw new ReportException(e.getMessage(), e);
 				}
 			}
 			if(token != null){
@@ -341,6 +347,10 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 				//returns a map of {userId -> {assignmentId -> {contentId -> score}}} for all users
 				JSONObject results = getResults(generateUrl(context, assignment, null), params);
 				if(results != null){
+					String errorMsg = getErrorMessage(results);
+					if(errorMsg != null){
+						throw new ReportException(errorMsg);
+					}
 					for (Iterator iterator = results.keys(); iterator.hasNext();) {
 						String userIdKey = (String) iterator.next();
 						JSONObject userAssignments = results.getJSONObject(userIdKey);
@@ -634,5 +644,21 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 			this.fileName = fileName;
 			this.data = data;
 		}
+	}
+	
+	/**
+	 * return null if no error was found
+	 * @param results
+	 * @return
+	 */
+	public String getErrorMessage(JSONObject results){
+		if(results != null && results.containsKey("result") && "failed".equals(results.get("result"))){
+			if(results.containsKey("message")){
+				return results.getString("message");
+			}else{
+				return "An error has occurred.";
+			}
+		}
+		return null;
 	}
 }
