@@ -246,11 +246,17 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 				try {
 					results = getResults(url, params);
 					if(results != null){
-						token = results.getString(PARAM_TOKEN);
+						//check for error message:
+						String errorMsg = getErrorMessage(results);
+						if(errorMsg == null){
+							token = results.getString(PARAM_TOKEN);
+						}else{
+							throw new ReportException(errorMsg);
+						}
 					}
 
 				} catch (Exception e) {
-					throw new ReportException(e);
+					throw new ReportException(e.getMessage(), e);
 				}
 			}
 			if(token != null){
@@ -288,11 +294,6 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 		throw new ReportException("Token was null or contentId wasn't correct: " + contentId);
 	}
 
-	public int getReviewScore(String contentId) throws QueueException,
-	ReportException, Exception {
-		return getReviewScore(contentId, null, null);
-	}
-	
 	public int getReviewScore(String contentId, String assignmentRef, String userId) throws QueueException,
 			ReportException, Exception {
 		/**
@@ -346,6 +347,10 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 				//returns a map of {userId -> {assignmentId -> {contentId -> score}}} for all users
 				JSONObject results = getResults(generateUrl(context, assignment, null), params);
 				if(results != null){
+					String errorMsg = getErrorMessage(results);
+					if(errorMsg != null){
+						throw new ReportException(errorMsg);
+					}
 					for (Iterator iterator = results.keys(); iterator.hasNext();) {
 						String userIdKey = (String) iterator.next();
 						JSONObject userAssignments = results.getJSONObject(userIdKey);
@@ -406,7 +411,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	}
 
 	public String getServiceName() {
-		return "VeriCite Plagiarism Service";
+		return "VeriCite";
 	}
 
 	public boolean isAcceptableContent(ContentResource arg0) {
@@ -422,28 +427,17 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 		
 	}
 	
-	public String getInlineTextId(String assignmentReference, String userId, long submissionTime){
-		return assignmentReference + "/" + userId + "/" + submissionTime;
-	}
-
-	public void queueContent(String userId, String siteId, String assignmentReference, List<String> contentIds, String inlineText, long submissionTime) throws QueueException{
+	public void queueContent(String userId, String siteId, String assignmentReference, List<ContentResource> content) throws QueueException{
 		List<FileSubmission> fileSubmissions = new ArrayList<FileSubmission>();
-		if(inlineText != null && !"".equals(inlineText.trim())){
-			String inlineTitle = "Inline Submission";
-			//make the inlineText an html file to make VeriCite read it cleaner:
-			inlineText = "<html><body>" + inlineText + "</body></html>";
-			fileSubmissions.add(new FileSubmission(getInlineTextId(assignmentReference, userId, submissionTime), inlineTitle, inlineText.getBytes()));
-		}
-		if(contentIds != null){
-			for(String contentId : contentIds){
+		if(content != null){
+			for(ContentResource res : content){
 				try {
-					final ContentResource res = contentHostingService.getResource(contentId);
 					if(res != null){
 						if(userId == null || "".equals(userId.trim())){
 							userId = res.getProperties().getProperty(ResourceProperties.PROP_CREATOR);
 						}
 						String fileName = res.getProperties().getProperty(ResourceProperties.PROP_DISPLAY_NAME);
-						fileSubmissions.add(new FileSubmission(contentId, fileName, res.getContent()));
+						fileSubmissions.add(new FileSubmission(res.getId(), fileName, res.getContent()));
 					}
 				}catch(Exception e){
 					throw new QueueException(e);
@@ -588,12 +582,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	    }
 	    return content.trim();
 	}
-	
-	
-	public boolean acceptInlineAndMultipleAttachments(){
-		return true;
-	}
-	
+		
 	private String getAssignmentTitle(String assignmentRef){
 		if(assignmentTitleCache.containsKey(assignmentRef)){
 			return assignmentTitleCache.get(assignmentRef);
@@ -655,5 +644,21 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 			this.fileName = fileName;
 			this.data = data;
 		}
+	}
+	
+	/**
+	 * return null if no error was found
+	 * @param results
+	 * @return
+	 */
+	public String getErrorMessage(JSONObject results){
+		if(results != null && results.containsKey("result") && "failed".equals(results.get("result"))){
+			if(results.containsKey("message")){
+				return results.getString("message");
+			}else{
+				return "An error has occurred.";
+			}
+		}
+		return null;
 	}
 }
