@@ -22,6 +22,7 @@ import net.sf.json.JSONObject;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
+import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpPost;
@@ -105,9 +106,42 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 		
 	}
 
-	public void createAssignment(String arg0, String arg1, Map arg2)
+	public void createAssignment(final String contextId, final String assignmentRef, final Map opts)
 			throws SubmissionException, TransientSubmissionException {
-		
+			new Thread(){
+				public void run() {
+					boolean isA2 = isA2(null, assignmentRef);
+					String assignmentId = getAssignmentId(assignmentRef, isA2);
+					if(assignmentId != null){
+						HttpClient client = HttpClientBuilder.create().build();
+						HttpPost post = new HttpPost(generateUrl(contextId, assignmentId, null));
+						MultipartEntityBuilder builder = MultipartEntityBuilder.create();        
+						builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
+						builder.addTextBody(PARAM_CONSUMER, consumer);
+						builder.addTextBody(PARAM_CONSUMER_SECRET, consumerSecret);
+						if(opts != null){
+							if(opts.containsKey("title")){
+								builder.addTextBody(PARAM_ASSIGNMENT_TITLE, opts.get("title").toString());
+							}else if(!isA2){
+								//we can find the title from the assignment ref for A1
+								String assignmentTitle = getAssignmentTitle(assignmentRef);
+								if(assignmentTitle != null){
+									builder.addTextBody(PARAM_ASSIGNMENT_TITLE, assignmentTitle);
+								}
+							}
+						}
+						final HttpEntity entity = builder.build();
+						post.setEntity(entity);
+						try {
+							HttpResponse response = client.execute(post);
+						} catch (ClientProtocolException e) {
+							e.printStackTrace();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+				}
+			}.start();
 	}
 
 	public List<ContentReviewItem> getAllContentReviewItems(String arg0,
@@ -197,18 +231,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	
 	private String getAccessUrl(String contentId, String assignmentRef, boolean instructor) throws QueueException, ReportException {
 		//assignmentRef: /assignment/a/f7d8c921-7d5a-4116-8781-9b61a7c92c43/cbb993da-ea12-4e74-bab1-20d16185a655
-		String context = null;
-		if(assignmentRef != null){
-			String[] assignmentRefSplit = assignmentRef.split("/");
-			if(assignmentRefSplit.length > 3){
-				context = assignmentRefSplit[3];
-			}
-		}else{
-			String[] contentSplit = contentId.split("/");
-			if(contentSplit.length > 2){
-				context = contentSplit[2];
-			}
-		}
+		String context = getSiteIdFromConentId(contentId);
 		if(context != null){
 			Map<String, String> params = new HashMap<String, String>();
 			params.put(PARAM_CONSUMER, consumer);
@@ -302,14 +325,12 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 		 */
 		
 		//first check if contentId already exists in cache:
+		boolean isA2 = isA2(contentId, null);
+		String context = getSiteIdFromConentId(contentId);
 		Integer score = null;
-		String assignment = null;
-		if(assignmentRef != null){
-			String[] assignmentSplit = assignmentRef.split("/");
-			if(assignmentSplit.length > 4){
-				assignment = assignmentSplit[4];
-			}
-			if(assignment != null && contentScoreCache.containsKey(assignment) 
+		String assignment = getAssignmentId(assignmentRef, isA2);
+		if(assignment != null){
+			if(contentScoreCache.containsKey(assignment) 
 					&& contentScoreCache.get(assignment).containsKey(userId) 
 					&& contentScoreCache.get(assignment).get(userId).containsKey(contentId)){
 				Object[] cacheItem = contentScoreCache.get(assignment).get(userId).get(contentId);
@@ -330,9 +351,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 		
 		if(score == null){
 			//wasn't in cache
-			String[] assignmentRefSplit = assignmentRef.split("/");
-			if(assignmentRefSplit.length > 3){
-				String context = assignmentRefSplit[3];
+			if(context != null){
 				Map<String, String> params = new HashMap<String, String>();
 				params.put(PARAM_CONSUMER, consumer);
 				params.put(PARAM_CONSUMER_SECRET, consumerSecret);
@@ -458,11 +477,10 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 		 * contentId: /attachment/04bad844-493c-45a1-95b4-af70129d54d1/Assignments/b9872422-fb24-4f85-abf5-2fe0e069b251/plag.docx
 		 */
 		
-		
-				String[] split = assignmentReference.split("/");
-				if(split.length == 5){
-					final String contextParam = split[3];
-					final String assignmentParam = split[4];
+		if(fileSubmissions != null && fileSubmissions.size() > 0){
+				final String contextParam = getSiteIdFromConentId(fileSubmissions.get(0).contentId);
+				final String assignmentParam = getAssignmentId(assignmentReference, isA2(fileSubmissions.get(0).contentId, null));
+				if(contextParam != null && assignmentParam != null){
 					User u;
 					try {
 						u = userDirectoryService.getUser(userId);
@@ -512,7 +530,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 						e1.printStackTrace();
 					}
 				}
-	
+		}
 		
 	}
 
@@ -657,6 +675,43 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 				return results.getString("message");
 			}else{
 				return "An error has occurred.";
+			}
+		}
+		return null;
+	}
+	
+	private boolean isA2(String contentId, String assignmentRef){
+		if(contentId != null && contentId.contains("/Assignment2/")){
+			return true;
+		}
+		if(assignmentRef != null && assignmentRef.startsWith("/asnn2contentreview/")){
+			return true;
+		}
+		return false;
+	}
+	
+	private String getSiteIdFromConentId(String contentId){
+		//contentId: /attachment/04bad844-493c-45a1-95b4-af70129d54d1/Assignments/b9872422-fb24-4f85-abf5-2fe0e069b251/plag.docx
+		if(contentId != null){
+			String[] split = contentId.split("/");
+			if(split.length > 2){
+				return split[2];
+			}
+		}
+		return null;
+	}
+	
+	private String getAssignmentId(String assignmentRef, boolean isA2){
+		if(assignmentRef != null){
+			String[] split = assignmentRef.split("/");
+			if(isA2){
+				if(split.length > 2){
+					return split[2];
+				}
+			}else{
+				if(split.length > 4){
+					return split[4];
+				}
 			}
 		}
 		return null;
