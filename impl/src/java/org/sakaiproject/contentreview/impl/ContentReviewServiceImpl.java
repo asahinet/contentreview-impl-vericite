@@ -172,7 +172,9 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 		String urlBase = "/sakai-contentreview-tool-vericite/images/";
 		String suffix = ".png";
 
-		if (score.equals(Long.valueOf(0))) {
+		if (score.compareTo(Long.valueOf(0)) < 0) {
+			return urlBase + "greyflag" + suffix;
+		}else if (score.equals(Long.valueOf(0))) {
 			return urlBase + "blueflag" + suffix;
 		} else if (score.compareTo(Long.valueOf(25)) < 0 ) {
 			return urlBase + "greenflag" + suffix;
