@@ -113,7 +113,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 					boolean isA2 = isA2(null, assignmentRef);
 					String assignmentId = getAssignmentId(assignmentRef, isA2);
 					if(assignmentId != null){
-						HttpClient client = HttpClientBuilder.create().build();
+						HttpClient client = HttpClientBuilder.create().useSystemProperties().build();
 						HttpPost post = new HttpPost(generateUrl(contextId, assignmentId, null));
 						MultipartEntityBuilder builder = MultipartEntityBuilder.create();        
 						builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
@@ -510,7 +510,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 
 						new Thread(){
 							public void run() {
-								HttpClient client = HttpClientBuilder.create().build();
+								HttpClient client = HttpClientBuilder.create().useSystemProperties().build();
 								HttpPost post = new HttpPost(generateUrl(contextParam, assignmentParam, userId));
 								try {
 									MultipartEntityBuilder builder = MultipartEntityBuilder.create();        
@@ -573,7 +573,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	 */
 	public JSONObject getResults(String url, Map<String, String> params) throws Exception{
 
-		HttpClient client = HttpClientBuilder.create().build();
+		HttpClient client = HttpClientBuilder.create().useSystemProperties().build();
 		HttpPost post = new HttpPost(url);
 
 		List<NameValuePair> nameValuePairs = new ArrayList<NameValuePair>(1);
