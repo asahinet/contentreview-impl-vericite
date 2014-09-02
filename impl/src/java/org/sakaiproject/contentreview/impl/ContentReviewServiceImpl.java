@@ -7,7 +7,6 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
@@ -19,6 +18,8 @@ import java.util.Map.Entry;
 
 import net.sf.json.JSONObject;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.NameValuePair;
@@ -32,8 +33,9 @@ import org.apache.http.entity.mime.content.ByteArrayBody;
 import org.apache.http.entity.mime.content.ContentBody;
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.message.BasicNameValuePair;
+import org.sakaiproject.authz.api.SecurityAdvisor;
+import org.sakaiproject.authz.api.SecurityService;
 import org.sakaiproject.component.api.ServerConfigurationService;
-import org.sakaiproject.content.api.ContentHostingService;
 import org.sakaiproject.content.api.ContentResource;
 import org.sakaiproject.contentreview.exception.QueueException;
 import org.sakaiproject.contentreview.exception.ReportException;
@@ -53,10 +55,12 @@ import org.sakaiproject.user.api.UserNotDefinedException;
 
 public class ContentReviewServiceImpl implements ContentReviewService {
 
+	private static Log log = LogFactory.getLog(ContentReviewServiceImpl.class);
+			
 	private ServerConfigurationService serverConfigurationService;
-	private ContentHostingService contentHostingService;
 	private UserDirectoryService userDirectoryService;
 	private EntityManager entityManager;
+	private SecurityService securityService;
 
     private static final String PARAM_CONSUMER = "consumer";
 	private static final String PARAM_CONSUMER_SECRET = "consumerSecret";
@@ -73,6 +77,10 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	private static final String PARAM_FILE_DATA = "filedata";
 	private static final String PARAM_EXTERNAL_CONTENT_ID = "externalContentId";
 	private static final String PARAM_ASSIGNMENT_TITLE = "assignmentTitle";
+	private static final String PARAM_ASSIGNMENT_INSTRUCTIONS = "assignmentInstructions";
+	private static final String PARAM_ASSIGNMENT_ATTACHMENT_DATA = "assignmentAttachmentData";
+	private static final String PARAM_ASSIGNMENT_ATTACHMENT_EXTERNAL_ID = "assignmentAttachmentExternalId";
+	private static final String PARAM_UPDATE_ASSIGNMNET_DETAILS = "updateAssignmentDetails";
 	
 	private static final String ASN1_GRADE_PERM = "asn.grade";
 
@@ -119,6 +127,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 						builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
 						builder.addTextBody(PARAM_CONSUMER, consumer);
 						builder.addTextBody(PARAM_CONSUMER_SECRET, consumerSecret);
+						builder.addTextBody(PARAM_UPDATE_ASSIGNMNET_DETAILS, "true");
 						if(opts != null){
 							if(opts.containsKey("title")){
 								builder.addTextBody(PARAM_ASSIGNMENT_TITLE, opts.get("title").toString());
@@ -129,15 +138,52 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 									builder.addTextBody(PARAM_ASSIGNMENT_TITLE, assignmentTitle);
 								}
 							}
+							if(opts.containsKey("instructions")){
+								try {
+									builder.addTextBody(PARAM_ASSIGNMENT_INSTRUCTIONS, URLEncoder.encode(opts.get("instructions").toString(), "UTF-8"));
+								} catch (UnsupportedEncodingException e) {
+									log.error(e.getMessage(), e);
+								}
+							}
+							if(opts.containsKey("attachments") && opts.get("attachments") instanceof List){
+								int i = 1;
+								SecurityAdvisor yesMan = new SecurityAdvisor(){
+									public SecurityAdvice isAllowed(String arg0, String arg1, String arg2) {
+										return SecurityAdvice.ALLOWED;
+									}
+								};
+								securityService.pushAdvisor(yesMan);
+								try{
+									for(String refStr : (List<String>) opts.get("attachments")){
+										try {
+											Reference ref = entityManager.newReference(refStr);
+											ContentResource res = (ContentResource) ref.getEntity();
+											if(res != null){
+												String fileName = res.getProperties().getProperty(ResourceProperties.PROP_DISPLAY_NAME);
+												ContentBody bin = new ByteArrayBody(res.getContent(), fileName);
+												builder.addPart(PARAM_ASSIGNMENT_ATTACHMENT_DATA + i, bin);
+												builder.addTextBody(PARAM_ASSIGNMENT_ATTACHMENT_EXTERNAL_ID + i, res.getId());
+												i++;
+											}
+										} catch (Exception e){
+											log.error(e.getMessage(), e);
+										}
+									}
+								}catch(Exception e){
+									log.error(e.getMessage(), e);
+								}finally{
+									securityService.popAdvisor(yesMan);
+								}
+							}
 						}
 						final HttpEntity entity = builder.build();
 						post.setEntity(entity);
 						try {
 							HttpResponse response = client.execute(post);
 						} catch (ClientProtocolException e) {
-							e.printStackTrace();
+							log.error(e.getMessage(), e);
 						} catch (IOException e) {
-							e.printStackTrace();
+							log.error(e.getMessage(), e);
 						}
 					}
 				}
@@ -523,13 +569,12 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 									post.setEntity(entity);
 									HttpResponse response = client.execute(post);
 								} catch (Exception e) {
-									e.printStackTrace();
+									log.error(e.getMessage(), e);
 								}
 							}
 						}.start();
-					} catch (UserNotDefinedException e1) {
-						// TODO Auto-generated catch block
-						e1.printStackTrace();
+					} catch (UserNotDefinedException e) {
+						log.error(e.getMessage(), e);
 					}
 				}
 		}
@@ -618,7 +663,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 						assignmentTitleCache.put(assignmentRef, assignmentTitle);
 					}
 				} catch (Exception e) {
-					e.printStackTrace();
+					log.error(e.getMessage(), e);
 				}
 			}
 			return assignmentTitle;
@@ -632,14 +677,6 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 	public void setServerConfigurationService(
 			ServerConfigurationService serverConfigurationService) {
 		this.serverConfigurationService = serverConfigurationService;
-	}
-
-	public ContentHostingService getContentHostingService() {
-		return contentHostingService;
-	}
-
-	public void setContentHostingService(ContentHostingService contentHostingService) {
-		this.contentHostingService = contentHostingService;
 	}
 
 	public UserDirectoryService getUserDirectoryService() {
@@ -717,5 +754,13 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 			}
 		}
 		return null;
+	}
+
+	public SecurityService getSecurityService() {
+		return securityService;
+	}
+
+	public void setSecurityService(SecurityService securityService) {
+		this.securityService = securityService;
 	}
 }
