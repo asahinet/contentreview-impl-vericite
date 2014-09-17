@@ -259,28 +259,29 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 		return null;
 	}
 
-	public String getReviewReport(String contentId, String assignmentRef) throws QueueException,
+	public String getReviewReport(String contentId, String assignmentRef, String userId) throws QueueException,
 			ReportException {
-		return getAccessUrl(contentId, assignmentRef, false);
+		return getAccessUrl(contentId, assignmentRef, userId, false);
 	}
 
-	public String getReviewReportInstructor(String contentId, String assignmentRef) throws QueueException,
+	public String getReviewReportInstructor(String contentId, String assignmentRef, String userId) throws QueueException,
 			ReportException {
 		/**
 		 * contentId: /attachment/04bad844-493c-45a1-95b4-af70129d54d1/Assignments/b9872422-fb24-4f85-abf5-2fe0e069b251/plag.docx
 		 */
-		return getAccessUrl(contentId, assignmentRef, true);
+		return getAccessUrl(contentId, assignmentRef, userId, true);
 	}
 
-	public String getReviewReportStudent(String contentId, String assignmentRef) throws QueueException,
+	public String getReviewReportStudent(String contentId, String assignmentRef, String userId) throws QueueException,
 			ReportException {
-		return getAccessUrl(contentId, assignmentRef, false);
+		return getAccessUrl(contentId, assignmentRef, userId, false);
 	}
 	
-	private String getAccessUrl(String contentId, String assignmentRef, boolean instructor) throws QueueException, ReportException {
+	private String getAccessUrl(String contentId, String assignmentRef, String userId, boolean instructor) throws QueueException, ReportException {
 		//assignmentRef: /assignment/a/f7d8c921-7d5a-4116-8781-9b61a7c92c43/cbb993da-ea12-4e74-bab1-20d16185a655
 		String context = getSiteIdFromConentId(contentId);
 		if(context != null){
+			String assignmentId = getAssignmentId(assignmentRef, isA2(contentId, assignmentRef));
 			Map<String, String> params = new HashMap<String, String>();
 			params.put(PARAM_CONSUMER, consumer);
 			String token = null;
@@ -302,19 +303,27 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 				}
 				//this is an instructor, give them instructor role when viewing a report 
 				params.put(PARAM_USER_ROLE, PARAM_USER_ROLE_INSTRUCTOR); 
+			}else{
+				//if the user is not an instructor, make sure the content id is set for the token request and access url
+				params.put(PARAM_EXTERNAL_CONTENT_ID, contentId);
+				//make sure to set the token to expect the learner role only for non-instructors
+				params.put(PARAM_USER_ROLE, PARAM_USER_ROLE_LEARNER);
 			}
-			String url = generateUrl(context, null, null);
+			
 			if(token == null){
 				//token wasn't cached, let's look it up
 				params.put(PARAM_CONSUMER_SECRET, consumerSecret);
-				if(!instructor){
-					//if the user is an instructor then we don't need to worry about specific content ids 
-					//when checking access
-					params.put(PARAM_EXTERNAL_CONTENT_ID, contentId);
-				}
 				params.put(PARAM_TOKEN_REQUEST, "true");
 				JSONObject results;
 				try {
+					String url = "";
+					if(instructor){
+						//use a generic url (no assignment or user) since this is an instructor and we want any instructor in this site
+						//to user this cached token for any assignment in this site
+						url = generateUrl(context, null, null);
+					}else{
+						url = generateUrl(context, assignmentId, userId);
+					}
 					results = getResults(url, params);
 					if(results != null){
 						//check for error message:
@@ -335,6 +344,10 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 				if(instructor && !instructorSiteTokenCache.containsKey(context)){
 					instructorSiteTokenCache.put(context, new Object[]{token, new Date()});
 				}
+				if(!instructor){
+					//make sure the user role learner is passed in because the token expects this
+					params.put(PARAM_USER_ROLE, PARAM_USER_ROLE_LEARNER);
+				}
 				//we have a request token instead of the secret so that a user can see it
 				params.remove(PARAM_CONSUMER_SECRET);
 				params.put(PARAM_TOKEN, token);
@@ -342,7 +355,7 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 				params.remove(PARAM_TOKEN_REQUEST);
 				//now tell the service we want to view the report
 				params.put(PARAM_VIEW_REPORT, "true");
-				//since we could have stripped out this parameter for the instructor, put it back 
+				//since we could have left this parameter out for the instructor, put it back 
 				//in so we know what content the user wants to view
 				params.put(PARAM_EXTERNAL_CONTENT_ID, contentId);
 				String urlParameters = "";
@@ -358,6 +371,8 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 						}
 					}
 				}
+				//use a specific user and content access for this url so that VeriCite knows who is visitng and what they want to see
+				String url = generateUrl(context, assignmentId, userId);
 				return url + "?" + urlParameters;
 			}
 		}
