@@ -1,408 +1,1590 @@
-Index: assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmissionEdit.java
+Index: .
 ===================================================================
---- assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmissionEdit.java	(revision 313698)
-+++ assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmissionEdit.java	(working copy)
-@@ -241,5 +241,5 @@
- 	 * Post attachments to the content review service
- 	 * @param attachments
- 	 */
--	public void postAttachment(List attachments);
-+	public void postAssignmentToContentReviewService(String inlineText, List attachments);
+--- .	(revision 313717)
++++ .	(working copy)
+
+Property changes on: .
+___________________________________________________________________
+Modified: svn:mergeinfo
+   Merged /assignment/trunk:r310555,312651-312652,313645,313682
+   Merged /assignment/branches/SAK-26318:r310368-310553
+Index: assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmission.java
+===================================================================
+--- assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmission.java	(revision 313717)
++++ assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmission.java	(working copy)
+@@ -42,6 +42,9 @@
+ 	
+ 	/** submission by different user */
+ 	public static final String SUBMITTER_USER_ID = "submitted_user_id";
++
++	/** resource property that marks the attachment as being the inline submission (boolean) */
++	public static final String PROP_INLINE_SUBMISSION = "assignment_submission_attachment_is_inline";
+ 	
+ 	/**
+ 	 * Access the context at the time of creation.
+@@ -121,6 +124,11 @@
+ 	public List getSubmittedAttachments();
+ 
+ 	/**
++	 * Access the list of attachments to this response to the Assignment that do not have PROP_INLINE_SUBMISSION set
++	 */
++	public List getVisibleSubmittedAttachments();
++
++	/**
+ 	 * Get the general comments by the grader
+ 	 * 
+ 	 * @return The text of the grader's comments; may be null.
+@@ -254,4 +262,9 @@
+      * @return error string, if any, returned from review service
+      */
+     public String getReviewError();
++
++	/**
++	 * Return a list of objects containing the ContentReviewResults	--bbailla2
++	 */
++	public List<ContentReviewResult> getContentReviewResults();
  }
 Index: assignment-bundles/resources/assignment.properties
 ===================================================================
---- assignment-bundles/resources/assignment.properties	(revision 313698)
+--- assignment-bundles/resources/assignment.properties	(revision 313717)
 +++ assignment-bundles/resources/assignment.properties	(working copy)
-@@ -618,7 +618,7 @@
+@@ -198,8 +198,9 @@
+ gen.theare2       = There are no submissions.
+ gen.thearecur1    = There are currently no assignments at this location.
+ gen.thearecur2    = There are currently no submissions at this location.
+-gen.theassall4    = This assignment allows submissions using both the text box below and attached documents. Type your comments in the box below and use the Add Attachments button to include other documents. Save frequently while working.
+-gen.theassall6    = This assignment allows submissions using the text box below only. Type in your submission. Save frequently while working.
++gen.theassall4    = This assignment allows submissions using both the text box below and attached documents. Type your submission in the box below and use the Browse button or the "select files" button to include other documents. <b>Save frequently while working</b>.
++gen.theassall6    = This assignment allows submissions using the text box below only. Type in your submission. <b>Save frequently while working</b>.
++gen.yoursubwill   = Your submission will be sent to {0} to be electronically reviewed for plagiarism.
+ gen.theassinf     = The assignment info
+ gen.title         = Title
+ gen.view2         = View
+@@ -374,15 +375,22 @@
+ stuviewsubm.youatt     = Your attached submission
+ stuviewsubm.submissatt =Submission attachment(s)
+ stuviewsubm.listsummary=List of attachments. Column 1: attachment link; column 2: attachment properties; column 3: link to remove attachment from list
++stuviewsubm.listsummary.simple=List of attachments. Column 1: attachment link; column 2: attachment properties;
+ stuviewsubm.removeatt=Remove
+ stuviewsubm.attfromcomputerlabel=Select a file from computer
+ stuviewsubm.attfromcomputerlabelmore=Select more files from computer
+ stuviewsubm.attfromserverlabel=or select files from workspace or site
+ stuviewsubm.attfromserverlabelmore= or select more files from workspace or site
+ feedbacktext = Feedback Text
+-stuviewsubm.submitreminder=Don't forget to save or submit
++stuviewsubm.submitreminder=Don't forget to save or submit!
++stuviewsubm.modifytoresubmit=You may resubmit if you modify this submission.
+ feedbackcomment = Feedback Comment
+ 
++stuviewsubm.typesubhaschanged.inline = The submission type for this assignment has changed. This text from your previous submission is for your reference only and will NOT be included if you resubmit.
++stuviewsubm.typesubhaschanged.attach = The submission type for this assignment has changed. These files from your previous submission are for your reference only and will NOT be included if you resubmit.
++stuviewsubm.typesubhaschanged.singleUploadedFileOnly = The submission type for this assignment has changed to only accept a single file. To resubmit, select one file from your previous submission or upload a new file.
++stuviewsubm.uploadnew = Upload a new file
++
+ # Taggable
+ tag.emptylist     = There are no tags to display.
+ tag.tags          = Tags
+@@ -402,7 +410,7 @@
+ fail = Fail
+ viewassig.datcre     = Date created
+ viewassig.shoassinf  = Show assignment info
+-viewassig.theassall1 = This assignment allows both typed in text and/or attached documents.Type in your comments in the box below, and use the Add Attachments button to include other documents as part of your submission. Save frequently while working.
++viewassig.theassall1 = This assignment allows both typed in text and/or attached documents.Type in your submission in the box below, and use the Browse button or the "select files" button to include other documents as part of your submission. <b>Save frequently while working</b>.
+ viewassig.theassall3 = This assignment allows submissions by attaching documents only. Use the Add Attachments button below to attach 1 or more documents.
+ viewassig.theassall5 = This assignment allows submissions using the text box below only. Please type in your submission and save frequently while working.
+ viewassig.viewass1   = Viewing assignment...
+@@ -453,6 +461,8 @@
+ 
+ youmust7 = You must type in your answer in the text input area before submission.
+ 
++youmust8 = You must upload an attachment
++
+ #added during legacy tool refactoring
+ list.show = Show
+ list.itemsper = items...
+@@ -617,8 +627,13 @@
+ uploadall.alert.zipFile=You have not selected a zip archive file. You must select either a .zip or a .sit archive file as the upload file.
  
  review.use = Use {0}
++review.switch.ne.1 = {0} is not available for non-electronic submissions.
++review.switch.ne.2 = {0} is not available for non-electronic submissions. "Use Turnitin" has been deselected below.
  review.allow = Allow students to view report
 -review.report = Turnitin Report
 +review.report = Report
++review.report.expand = Expand reports
++review.report.collapse = Collapse reports
++review.reports = reports
  review.submit.papers.repository=Submit papers to the following repository:
  review.submit.papers.repository.none=None
  review.submit.papers.repository.standard=Standard Paper Repository
-@@ -636,7 +636,10 @@
+@@ -636,8 +651,9 @@
  gen.rev = TurnItIn
  review.notavail = Not available yet
  review.viewreport = View Report
 -review.title = {0} Service
-+review.title = {0}
-+review.acceptInlineAndAllAttachments=Inline text and all attachments will be submitted
-+review.not.acceptInlineAndAllAttachments=Only the first attachment will be submitted
-+
++review.title = {0} Plagiarism Service
  review.noreport = no report
++review.contentReviewIndicator=Originality of submissions will be verified by {0}.
  
  ## notification email content
+ noti.subject.label=Subject:
+@@ -795,8 +811,9 @@
+ content_review.pending.info = This attachment has been submitted and is pending review.
+ 
+ content_review.error = An unknown error occurred. The originality review for this attachment is not available.
+-content_review.error.createAssignment=The assignment was saved, but Turnitin information was unable to be updated.  Please try saving again.
+-content_review.note=<div><br /><em>NOTE, If using Turnitin:</em><ol><li>Set this assignment to &quot;Single Uploaded File only.&quot;</li> <li>Tell students:</li><ol><li>Submit only one attachment.</li><li>Only use file types: Word, PDF, HTML, RTF, or plain text.</li><li>Always include file extension.</li></ol></ol></div>
++content_review.error.createAssignment=An error with {0} has occurred while creating this assignment. {1} has saved the assignment in draft mode. Please try posting this assignment again later.
++content_review.note=<div><br /><em>NOTE:</em><ul><li>When submitting attachments, students should only use these file types: Word (.doc, .docx), PostScript (.ps), PDF (.pdf), HTML (.html), rich or plain text (.rtf, .txt).</li> <li>Students should always save files with the appropriate extension.</li> </ul></div>
++submission.inline=Inline Submission
+ 
+ noti.releaseresubmission.subject.content=Email notification for assignment with resubmissions allowed
+ noti.releaseresubmission.text=Your submission to assignment "{0}" has been corrected and it allows resubmissions. Please go to {1} to view details.
 Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java
 ===================================================================
---- assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java	(revision 313698)
+--- assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java	(revision 313717)
 +++ assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java	(working copy)
-@@ -9283,71 +9283,174 @@
- 				return -2;
- 			}
- 
--			if (m_submittedAttachments.isEmpty()) {
-+			if (m_submittedAttachments.isEmpty() && 
-+					(!contentReviewService.acceptInlineAndMultipleAttachments() || (contentReviewService.acceptInlineAndMultipleAttachments() && (this.getSubmittedText() == null || "".equals(this.getSubmittedText().trim()))))) {
- 				M_log.debug(this + " getReviewScore No attachments submitted.");
- 				return -2;
- 			}
- 			else
- 			{
--				//we may have already retrived this one
--				if (m_reviewScore != null && m_reviewScore > -1) {
--					M_log.debug("returning stored value of " + m_reviewScore);
--					return m_reviewScore.intValue();
--				}
-+				Set<String> requeueContentIds = new HashSet<String>();
-+				String requeueInlineText = null;
-+				if(contentReviewService.acceptInlineAndMultipleAttachments()){
-+					//check inline text first:
-+					boolean oneAccepted = false;
-+					String userId = (String)this.getSubmitterIds().get(0);
-+					//check inline if there is any data:
-+					if(this.getSubmittedText() != null && !"".equals(this.getSubmittedText().trim())){
-+						try{
-+							Long status = contentReviewService.getReviewStatus(contentReviewService.getInlineTextId(getAssignment().getReference(), userId, this.getTimeSubmitted().getTime()));
-+							if (status != null && (status.equals(ContentReviewItem.NOT_SUBMITTED_CODE) || status.equals(ContentReviewItem.SUBMITTED_AWAITING_REPORT_CODE)))  {
-+								M_log.debug(this + " getReviewStatus returned a status of: " + status);
-+							}else{
-+								oneAccepted = true;
-+							}
-+						}catch (QueueException cie) {
-+							//inline text can't be found, try to resubmit it:
-+							requeueInlineText = this.getSubmittedText();
-+						}
-+					}
- 
--				ContentResource cr = getFirstAcceptableAttachement();
--				if (cr == null )
--				{
--					M_log.debug(this + " getReviewScore No suitable attachments found in list");
--					return -2;
--				}
-+					for( int i =0; i < m_submittedAttachments.size();i++ ) {
-+						if(oneAccepted){
-+							break;
-+						}
-+						Reference ref = (Reference)m_submittedAttachments.get(i);
-+						ContentResource contentResource = (ContentResource)ref.getEntity();
-+						try{
-+							if(contentReviewService.isAcceptableContent(contentResource)){
-+								Long status = contentReviewService.getReviewStatus(contentResource.getId());
-+								if (status != null && (status.equals(ContentReviewItem.NOT_SUBMITTED_CODE) || status.equals(ContentReviewItem.SUBMITTED_AWAITING_REPORT_CODE)))  {
-+									M_log.debug(this + " getReviewStatus returned a status of: " + status);
-+								}else{
-+									oneAccepted = true;
-+								}
-+							}
-+						}catch (QueueException cie) {
-+							//try to resubmit attachment
-+							requeueContentIds.add(contentResource.getId());
-+						}
-+					}
-+					if(!oneAccepted){
-+						M_log.debug("Couldn't find any accepted materials");
-+						return -2;
-+					}
- 
-+					//next get the scores of each content and show the highest score:
-+					int highestScore = 0;
-+					boolean oneScored = false;
-+					if(this.getSubmittedText() != null && !"".equals(this.getSubmittedText().trim())){
-+						//inline text:
-+						try{
-+							int score = contentReviewService.getReviewScore(contentReviewService.getInlineTextId(getAssignment().getReference(), userId, getTimeSubmitted().getTime()), getAssignment().getReference(), userId);
-+							oneScored = true;
-+							if(score > highestScore){
-+								highestScore = score;
-+							}
-+						}catch (QueueException cie) {
-+							//inline text can't be found, try to resubmit it:
-+							requeueInlineText = this.getSubmittedText();
-+						} catch (ReportException e) {
-+							M_log.error(e.getMessage(), e);
-+						} catch (Exception e) {
-+							M_log.error(e.getMessage(), e);
-+						}
-+					}
-+					//now get the attachments:
-+					for( int i =0; i < m_submittedAttachments.size();i++ ) {
-+						Reference ref = (Reference)m_submittedAttachments.get(i);
-+						ContentResource contentResource = (ContentResource)ref.getEntity();
-+						if(contentReviewService.isAcceptableContent(contentResource)){
-+							try{
-+								int score = contentReviewService.getReviewScore(contentResource.getId(), getAssignment().getReference(), userId);
-+								oneScored = true;
-+								if(score > highestScore){
-+									highestScore = score;
-+								}
-+							}catch (QueueException cie) {
-+								//try to resubmit attachment
-+								requeueContentIds.add(contentResource.getId());
-+							} catch (ReportException e) {
-+								M_log.error(e.getMessage(), e);
-+							} catch (Exception e) {
-+								M_log.error(e.getMessage(), e);
-+							}
-+						}
-+					}
-+					if(!oneScored && requeueContentIds.size() == 0 && requeueInlineText == null){
-+						//more likely service is down
-+						return -2;
-+					}
-+					if(requeueContentIds.size() > 0 || requeueInlineText != null){
-+						try {
-+							contentReviewService.queueContent(userId, this.getContext(), getAssignment().getReference(), new ArrayList<String>(requeueContentIds), requeueInlineText, getTimeSubmitted().getTime());
-+						} catch (QueueException e) {
-+							M_log.warn(" getReviewScore multiple queue: Unable to queue content with content review Service: " + e.getMessage());
-+						}
-+					}
- 
-+					return highestScore;
-+				}else{
-+					//single file upload
-+					//we may have already retrived this one
-+					if (m_reviewScore != null && m_reviewScore > -1) {
-+						M_log.debug("returning stored value of " + m_reviewScore);
-+						return m_reviewScore.intValue();
-+					}
- 
--				try {
--					//we need to find the first attachment the CR will accept
--					String contentId = cr.getId();
--					M_log.debug(this + " getReviewScore checking for score for content: " + contentId);
-+					ContentResource cr = getFirstAcceptableAttachement();
-+					if (cr == null )
-+					{
-+						M_log.debug(this + " getReviewScore No suitable attachments found in list");
-+						return -2;
-+					}
- 
--                    Long status = contentReviewService.getReviewStatus(contentId);
--                    if (status != null && (status.equals(ContentReviewItem.NOT_SUBMITTED_CODE) || status.equals(ContentReviewItem.SUBMITTED_AWAITING_REPORT_CODE)))  {
--                        M_log.debug(this + " getReviewStatus returned a status of: " + status);
--                        return -2;
--                    }
- 
+@@ -70,6 +70,7 @@
+ import org.sakaiproject.assignment.api.AssignmentService;
+ import org.sakaiproject.assignment.api.AssignmentSubmission;
+ import org.sakaiproject.assignment.api.AssignmentSubmissionEdit;
++import org.sakaiproject.assignment.api.ContentReviewResult;
+ import org.sakaiproject.assignment.taggable.api.AssignmentActivityProducer;
+ import org.sakaiproject.authz.api.AuthzGroup;
+ import org.sakaiproject.authz.api.AuthzPermissionException;
+@@ -6544,6 +6545,12 @@
+ 	 */
+ 	public boolean canSubmit(String context, Assignment a)
+ 	{
++		// submissions are never allowed to non-electronic assignments	--bbailla2
++		if (a.getContent().getTypeOfSubmission() == Assignment.NON_ELECTRONIC_ASSIGNMENT_SUBMISSION)
++		{
++			return false;
++		}
++
+ 		// return false if not allowed to submit at all
+ 		if (!allowAddSubmissionCheckGroups(context, a)) return false;
+ 		
+@@ -9314,8 +9321,8 @@
+                         M_log.debug(this + " getReviewStatus returned a status of: " + status);
+                         return -2;
+                     }
+-
 -					int score = contentReviewService.getReviewScore(contentId);
--					m_reviewScore = score;
--					M_log.debug(this + " getReviewScore CR returned a score of: " + score);
--					return score;
--						
--				} 
--				catch (QueueException cie) {
--					//should we add the item
-+
++                    String userId = (String)this.getSubmitterIds().get(0);
++					int score = contentReviewService.getReviewScore(contentId, getAssignment().getReference(), userId);
+ 					m_reviewScore = score;
+ 					M_log.debug(this + " getReviewScore CR returned a score of: " + score);
+ 					return score;
+@@ -9326,10 +9333,9 @@
  					try {
--						
-+						//we need to find the first attachment the CR will accept
-+						String contentId = cr.getId();
-+						M_log.debug(this + " getReviewScore checking for score for content: " + contentId);
-+
-+						Long status = contentReviewService.getReviewStatus(contentId);
-+						if (status != null && (status.equals(ContentReviewItem.NOT_SUBMITTED_CODE) || status.equals(ContentReviewItem.SUBMITTED_AWAITING_REPORT_CODE)))  {
-+							M_log.debug(this + " getReviewStatus returned a status of: " + status);
-+							return -2;
-+						}
-+
-+						int score = contentReviewService.getReviewScore(contentId);
-+						m_reviewScore = score;
-+						M_log.debug(this + " getReviewScore CR returned a score of: " + score);
-+						return score;
-+
-+					} 
-+					catch (QueueException cie) {
-+						//should we add the item
-+						try {
-+
+ 						
  							M_log.debug(this + " getReviewScore Item is not in queue we will try add it");
- 							String contentId = cr.getId();
+-							String contentId = cr.getId();
  							String userId = (String)this.getSubmitterIds().get(0);
  							try {
 -								contentReviewService.queueContent(userId, null, getAssignment().getReference(), contentId);
-+								contentReviewService.queueContent(userId, null, getAssignment().getReference(), Arrays.asList(contentId), null, getTimeSubmitted().getTime());
++								contentReviewService.queueContent(userId, this.getContext(), getAssignment().getReference(), Arrays.asList(cr));
  							}
  							catch (QueueException qe) {
  								M_log.warn(" getReviewScore Unable to queue content with content review Service: " + qe.getMessage());
- 							}
--								
--							
--						
--					} catch (Exception e) {
--						e.printStackTrace();
-+
-+
-+
-+						} catch (Exception e) {
-+							e.printStackTrace();
-+						}
-+						return -1;
-+
- 					}
--					return -1;
--					
--				}
--				catch (Exception e) {
--					M_log.warn(this + " getReviewScore " + e.getMessage());
--					return -1;
--				}
--					
-+					catch (Exception e) {
-+						M_log.warn(this + " getReviewScore " + e.getMessage());
-+						return -1;
-+					}
-+				}		
- 			}
+@@ -9352,6 +9358,76 @@
  	
  			
-@@ -9355,12 +9458,43 @@
+ 		}
++
++		// SAK-26322	--bbailla2
++		/**
++		 * Essentially the same as getReviewScore() only it acts upon the ContentResource parameter rather than that which is returned by firstAcceptableAttachment().
++		 * TODO: consider deleting getReviewScore(). If not possible, then refactor to eliminate code duplication
++		 */
++		private int getReviewScore(ContentResource cr)
++		{
++			M_log.debug(this + " getReviewScore(ContentResource) for submission " + this.getId() + " and review service is: " + (this.getAssignment().getContent().getAllowReviewService()));
++
++			//null check, allow review service check
++			if (cr == null)
++			{
++				M_log.debug(this + " getReviewScore(ContentResource) called with cr == null");
++				return -2;
++			}
++
++			if (!this.getAssignment().getContent().getAllowReviewService())
++			{
++				M_log.debug(this + " getReviewScore(ContentResource) Content review is not enabled for this assignment");
++				return -2;
++			}
++
++			//get the status from the content review service, if it's in a valid status, get the score)
++			try
++			{
++				String contentId = cr.getId();
++				M_log.debug(this + " getReviewScore(ContentResource) checking for score for content: " + contentId);
++
++				Long status = contentReviewService.getReviewStatus(contentId);
++				if (status != null && (status.equals(ContentReviewItem.NOT_SUBMITTED_CODE) || status.equals(ContentReviewItem.SUBMITTED_AWAITING_REPORT_CODE)))
++				{
++					M_log.debug(this + " getReviewStatus returned a state of: " + status);
++					return -2;
++				}
++				String userId = (String)this.getSubmitterIds().get(0);
++				int score = contentReviewService.getReviewScore(contentId, getAssignment().getReference(), userId);
++				// TODO: delete the following line if there will be no repercussions:
++				m_reviewScore = score;
++				M_log.debug(this + " getReviewScore(ContentResource) CR returned a score of: " + score);
++				return score;
++			}
++			catch (QueueException cie)
++			{
++				//should we add the item
++				try
++				{
++					M_log.debug(" getReviewScore(ContentResource) Item is not in queue we will try to add it");
++					String userId = (String)this.getSubmitterIds().get(0);
++					try
++					{
++						contentReviewService.queueContent(userId, this.getContext(), getAssignment().getReference(), Arrays.asList(cr));
++					}
++					catch (QueueException qe)
++					{
++						M_log.warn(" getReviewScore(ContentResource) Unable to queue content with content review service: " + qe.getMessage());
++					}
++				}
++				catch (Exception e)
++				{
++					e.printStackTrace();
++				}
++				return -1;
++			}
++			catch (Exception e)
++			{
++				M_log.warn(this + " getReviewScore " + e.getMessage());
++				return -1;
++			}
++		}
  		
  		public String getReviewReport() {
  //			 Code to get updated report if default
--			if (m_submittedAttachments.isEmpty()) { 
-+			if (m_submittedAttachments.isEmpty()
-+					&& (!contentReviewService.acceptInlineAndMultipleAttachments() || (contentReviewService.acceptInlineAndMultipleAttachments() && (this.getSubmittedText() == null || "".equals(this.getSubmittedText().trim()))))) { 
- 				M_log.debug(this.getId() + " getReviewReport No attachments submitted."); 
- 				return "Error";
- 			}
- 			else
- 			{
-+				if(contentReviewService.acceptInlineAndMultipleAttachments()){
-+					//sent it the first acceptable attachment (or inline text id) so that the
-+					//service can look up information based on that
-+					String contentId = null;
-+					String userId = (String)this.getSubmitterIds().get(0);
-+					ContentResource cr = getFirstAcceptableAttachement();
-+					if(cr == null && getSubmittedText() != null && !"".equals(getSubmittedText())){
-+						contentId = contentReviewService.getInlineTextId(getAssignment().getReference(), userId, this.getTimeSubmitted().getTime());
-+					}else if(cr != null){
-+						contentId = cr.getId();
-+					}
-+					if(contentId != null){
-+						try{
-+							if (allowGradeSubmission(getReference())){
-+								return contentReviewService.getReviewReportInstructor(contentId, getAssignment().getReference(), UserDirectoryService.getCurrentUser().getId());
-+							}else{
-+								return contentReviewService.getReviewReportStudent(contentId, getAssignment().getReference(), UserDirectoryService.getCurrentUser().getId());
-+							}
-+						} catch (QueueException e) {
-+							M_log.debug(e.getMessage(), e);
-+							return "Error";
-+						} catch (ReportException e) {
-+							M_log.debug(e.getMessage(), e);
-+							return "Error";
-+						}
-+					}else{
-+						M_log.debug("couldn't find an acceptable content id for getReviewReport");
-+						return "Error";
-+					}
-+				}else{
- 				try {
- 					ContentResource cr = getFirstAcceptableAttachement();
- 					if (cr == null )
-@@ -9372,14 +9506,15 @@
- 					String contentId = cr.getId();
+@@ -9370,11 +9446,11 @@
+ 					}
  					
+ 					String contentId = cr.getId();
+-					
++					String userId = (String)this.getSubmitterIds().get(0);
  					if (allowGradeSubmission(getReference()))
 -						return contentReviewService.getReviewReportInstructor(contentId);
-+						return contentReviewService.getReviewReportInstructor(contentId, getAssignment().getReference(), UserDirectoryService.getCurrentUser().getId());
++						return contentReviewService.getReviewReportInstructor(contentId, getAssignment().getReference(), userId);
  					else
 -						return contentReviewService.getReviewReportStudent(contentId);
-+						return contentReviewService.getReviewReportStudent(contentId, getAssignment().getReference(), UserDirectoryService.getCurrentUser().getId());
++						return contentReviewService.getReviewReportStudent(contentId, getAssignment().getReference(), userId);
  					
  				} catch (Exception e) {
  					M_log.warn(":getReviewReport() " + e.getMessage());
- 					return "Error";
- 				}
-+				}
- 					
+@@ -9384,7 +9460,41 @@
  			}
  			
-@@ -11167,15 +11302,35 @@
+ 		}
++
++		//SAK-26322	--bbailla2
++		/**
++		 * Essentially the same as getReviewReport(), only it acts upon the ContentResource that is passed rather than that which is returned from getFirstAcceptableAttachment()
++		 * TODO: consider removing getReviewReport(). If this is not possible, eliminate code duplication
++		 */
++		private String getReviewReport(ContentResource cr)
++		{
++			if (cr == null)
++			{
++				M_log.debug(this.getId() + " getReviewReport(ContentResource) called with cr == null");
++				return "Error";
++			}
++
++			try
++			{
++				String contentId = cr.getId();
++				String userId = (String)this.getSubmitterIds().get(0);
++				if (allowGradeSubmission(getReference()))
++				{
++					return contentReviewService.getReviewReportInstructor(contentId, getAssignment().getReference(), userId);
++				}
++				else
++				{
++					return contentReviewService.getReviewReportStudent(contentId, getAssignment().getReference(), userId);
++				}
++			}
++			catch (Exception e)
++			{
++				M_log.warn(":getReviewReport(ContentResource) " + e.getMessage());
++				return "Error";
++			}
++		}
  		
++		//TODO: delete this and all calling methods if there are no repercussions	--bbailla2
+ 		private ContentResource getFirstAcceptableAttachement() {
+ 			String contentId = null;
+ 			try {
+@@ -9402,6 +9512,34 @@
+ 			}
+ 			return null;
+ 		}
++
++		/**
++		 * SAK-26322
++		 * Gets all attachments in m_submittedAttachments that are acceptable to the content review service
++		 * @author bbailla2
++		 */
++		private List<ContentResource> getAllAcceptableAttachments()
++		{
++			List<ContentResource> attachments = new ArrayList<ContentResource>();
++			for (int i = 0; i< m_submittedAttachments.size(); i++)
++			{
++				try
++				{
++					Reference ref = (Reference)m_submittedAttachments.get(i);
++					ContentResource contentResource = (ContentResource)ref.getEntity();
++					if (contentReviewService.isAcceptableContent(contentResource))
++					{
++						attachments.add((ContentResource)contentResource);
++					}
++				}
++				catch (Exception e)
++				{
++					M_log.warn(":getAllAcceptableAttachments() " + e.getMessage());
++					e.printStackTrace();
++				}
++			}
++			return attachments;
++		}
  		
+ 		public String getReviewStatus() {
+ 			return m_reviewStatus;
+@@ -9463,13 +9601,117 @@
+             }
+         }
+ 
++		//SAK-26322	--bbailla2
++		/**
++		 * Essentially the same as getReviewError(), only it acts upon the ContentResource that is passed rather than that which is returned from getFirstAcceptableAttachment()
++		 */
++		private String getReviewError(ContentResource cr)
++		{
++			if (cr == null)
++			{
++				M_log.debug(this.getId() + " getReviewReport(ContentResource) called with cr == null");
++				return null;
++			}
++			try
++			{
++				String contentId = cr.getId();
++				//This should use getLocalizedReviewErrorMesage(contentId)
++				//to get a i18n message of the error
++				Long status = contentReviewService.getReviewStatus(contentId);
++				String errorMessage = null;
+ 
++				// TODO: we can remove this null check if we use yoda statements below	--bbailla2
++				if (status != null)
++				{
++					if (status.equals(ContentReviewItem.REPORT_ERROR_NO_RETRY_CODE))
++					{
++						errorMessage = rb.getString("content_review.error.REPORT_ERROR_NO_RETRY_CODE");
++					}
++					else if (status.equals(ContentReviewItem.REPORT_ERROR_RETRY_CODE))
++					{
++						errorMessage = rb.getString("content_review.error.REPORT_ERROR_RETRY_CODE");
++					}
++					else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_NO_RETRY_CODE))
++					{
++						errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_NO_RETRY_CODE");
++					}
++					else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_RETRY_CODE))
++					{
++						errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_RETRY_CODE");
++					}
++					else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_RETRY_EXCEEDED))
++					{
++						errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_RETRY_EXCEEDED_CODE");
++					}
++					else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_USER_DETAILS_CODE))
++					{
++						errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_USER_DETAILS_CODE");
++					}
++					else if (ContentReviewItem.SUBMITTED_AWAITING_REPORT_CODE.equals(status) || ContentReviewItem.NOT_SUBMITTED_CODE.equals(status))
++					{
++						errorMessage = rb.getString("content_review.pending.info");
++					}
++				}
++
++				if (errorMessage == null)
++				{
++					errorMessage = rb.getString("content_review.error");
++				}
++
++				return errorMessage;
++			}
++			catch (Exception e)
++			{
++				M_log.warn(this + ":getReviewError(ContentResource) " + e.getMessage());
++				return null;
++			}
++		}
++
++
+ 		public String getReviewIconUrl() {
+ 			if (m_reviewIconUrl == null )
+ 				m_reviewIconUrl = contentReviewService.getIconUrlforScore(Long.valueOf(this.getReviewScore()));
+ 				
+ 			return m_reviewIconUrl;
+ 		}
++
++		// SAK-26322	--bbailla2
++		/**
++		 * @inheritDoc
++		 */
++		@Override
++		public List<ContentReviewResult> getContentReviewResults()
++		{
++			ArrayList<ContentReviewResult> reviewResults = new ArrayList<ContentReviewResult>();
++
++			//get all the attachments for this submission and populate the reviewResults
++			List<ContentResource> contentResources = getAllAcceptableAttachments();
++			Iterator<ContentResource> itContentResources = contentResources.iterator();
++			while (itContentResources.hasNext())
++			{
++				ContentResource cr = itContentResources.next();
++				ContentReviewResult reviewResult = new ContentReviewResult();
++
++				reviewResult.setContentResource(cr);
++				int reviewScore = getReviewScore(cr);
++				reviewResult.setReviewScore(reviewScore);
++				reviewResult.setReviewReport(getReviewReport(cr));
++				//skip review status, it's unused
++				String iconUrl = contentReviewService.getIconUrlforScore(Long.valueOf(reviewScore));
++				reviewResult.setReviewIconURL(iconUrl);
++				reviewResult.setReviewError(getReviewError(cr));
++
++				if ("true".equals(cr.getProperties().getProperty(PROP_INLINE_SUBMISSION)))
++				{
++					reviewResults.add(0, reviewResult);
++				}
++				else
++				{
++					reviewResults.add(reviewResult);
++				}
++			}
++			return reviewResults;
++		}
  		
--		public void postAttachment(List attachments){
-+		public void postAssignmentToContentReviewService(String inlineText, List attachments){
+ 		/**
+ 		 * constructor
+@@ -10502,7 +10744,31 @@
+ 			return m_submittedAttachments;
+ 		}
+ 
++		//SAK-26322	--bbailla2
+ 		/**
++		 * @inheritDoc
++		 */
++		@Override
++		public List getVisibleSubmittedAttachments()
++		{
++			List visibleAttachments = new ArrayList();
++			if (m_submittedAttachments != null)
++			{
++				Iterator itAttachments = m_submittedAttachments.iterator();
++				while (itAttachments.hasNext())
++				{
++					Reference attachment = (Reference) itAttachments.next();
++					ResourceProperties props = attachment.getProperties();
++					if (!"true".equals(props.getProperty(PROP_INLINE_SUBMISSION)))
++					{
++						visibleAttachments.add(attachment);
++					}
++				}
++			}
++			return visibleAttachments;
++		}
++
++		/**
+ 		 * Get the general comments by the grader
+ 		 * 
+ 		 * @return The text of the grader's comments; may be null.
+@@ -11171,23 +11437,28 @@
  			//Send the attachment to the review service
  
  			try {
 -				ContentResource cr = getFirstAcceptableAttachement(attachments);
- 				Assignment ass = this.getAssignment();
+-				Assignment ass = this.getAssignment();
++				//SAK-26322	--bbailla2
++				List<ContentResource> resources = getAllAcceptableAttachments(attachments);
++				Assignment ass = this.getAssignment();			
  				if (ass != null)
  				{
 -					contentReviewService.queueContent(null, null, ass.getReference(), cr.getId());
 +					String userId = (String)this.getSubmitterIds().get(0);
-+					List<String> contentIds = new ArrayList<String>();
-+					if(contentReviewService.acceptInlineAndMultipleAttachments()){
-+						for( int i =0; i < attachments.size();i++ ) { 
-+							Reference attachment = (Reference)attachments.get(i);
-+							try {
-+								ContentResource res = m_contentHostingService.getResource(attachment.getId());
-+								if(contentReviewService.isAcceptableContent(res)){
-+									contentIds.add(res.getId());
-+								}
-+							}catch(Exception e){
-+								M_log.warn(e.getMessage(), e);
-+							}
-+						}
-+					}else{
-+						//single file upload
-+						ContentResource cr = getFirstAcceptableAttachement(attachments);
-+						if(cr != null){
-+							contentIds.add(cr.getId());
-+						}
-+					}
-+					contentReviewService.queueContent(userId, this.getContext(), ass.getReference(), contentIds, inlineText, this.getTimeSubmitted().getTime());
++					contentReviewService.queueContent(userId, this.getContext(), ass.getReference(), resources);
  				}
  				else
  				{
+ 					// error, assignment couldn't be found. Log the error
+ 					M_log.debug(this + " BaseAssignmentSubmissionEdit postAttachment: Unable to find assignment associated with submission id= " + this.m_id + " and assignment id=" + this.m_assignment);
+ 				}
+-			} catch (QueueException qe) {
++			}
++			catch (QueueException qe)
++			{
+ 				M_log.warn(" BaseAssignmentSubmissionEdit postAttachment: Unable to add content to Content Review queue: " + qe.getMessage());
+-			} catch (Exception e) {
++			}
++			catch (Exception e)
++			{
+ 				e.printStackTrace();
+ 			}
+-
+ 		}
+ 
+ 		private ContentResource getFirstAcceptableAttachement(List attachments) {
+@@ -11217,6 +11488,40 @@
+ 			}
+ 			return null;
+ 		}
++
++		private List<ContentResource> getAllAcceptableAttachments(List attachments)
++		{
++			List<ContentResource> resources = new ArrayList<ContentResource>();
++			for (int i = 0; i < attachments.size(); i++)
++			{
++				Reference attachment = (Reference) attachments.get(i);
++				try
++				{
++					ContentResource res = m_contentHostingService.getResource(attachment.getId());
++					if (contentReviewService.isAcceptableContent(res))
++					{
++						resources.add(res);
++					}
++				}
++				catch (PermissionException e)
++				{
++					e.printStackTrace();
++					M_log.warn(":getAllAcceptableAttachments " + e.getMessage());
++				}
++				catch (IdUnusedException e)
++				{
++					e.printStackTrace();
++					M_log.warn(":getAllAcceptableAttachments " + e.getMessage());
++				}
++				catch (TypeException e)
++				{
++					e.printStackTrace();
++					M_log.warn(":getAllAcceptableAttachments " + e.getMessage());
++				}
++			}
++
++			return resources;
++		}
+ 		
+ 		/**
+ 		 * Take all values from this object.
 Index: assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java
 ===================================================================
---- assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java	(revision 313698)
+--- assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java	(revision 313717)
 +++ assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java	(working copy)
-@@ -837,7 +837,12 @@
- 		// Check whether content review service is enabled, present and enabled for this site
- 		getContentReviewService();
- 		context.put("allowReviewService", allowReviewService && contentReviewService != null && contentReviewService.isSiteAcceptable(s));
--
-+		if(contentReviewService != null && contentReviewService.acceptInlineAndMultipleAttachments()){
-+			context.put("acceptInlineAndMultipleAttachments", true);
-+		}else{
-+			context.put("acceptInlineAndMultipleAttachments", false);
-+		}
-+	
- 		if (allowReviewService && contentReviewService != null && contentReviewService.isSiteAcceptable(s)) {
- 			//put the review service stings in context
+@@ -20,6 +20,7 @@
+ 
+ package org.sakaiproject.assignment.tool;
+ 
++import java.io.ByteArrayInputStream;
+ import java.io.File;
+ import java.io.FileInputStream;
+ import java.io.FileOutputStream;
+@@ -843,8 +844,13 @@
  			String reviewServiceName = contentReviewService.getServiceName();
-@@ -4451,8 +4456,8 @@
- 							//Post the attachments before clearing so that we don't sumbit duplicate attachments
- 							//Check if we need to post the attachments
- 							if (a.getContent().getAllowReviewService()) {
+ 			String reviewServiceTitle = rb.getFormattedMessage("review.title", new Object[]{reviewServiceName});
+ 			String reviewServiceUse = rb.getFormattedMessage("review.use", new Object[]{reviewServiceName});
+-			context.put("reviewServiceName", reviewServiceTitle);
++			String reviewServiceNonElectronic1 = rb.getFormattedMessage("review.switch.ne.1", new Object[]{reviewServiceName});
++			String reviewServiceNonElectronic2 = rb.getFormattedMessage("review.switch.ne.2", new Object[]{reviewServiceName});
++			context.put("reviewServiceName", reviewServiceName);
++			context.put("reviewServiceTitle", reviewServiceTitle);
+ 			context.put("reviewServiceUse", reviewServiceUse);
++			context.put("reviewSwitchNe1", reviewServiceNonElectronic1);
++			context.put("reviewSwitchNe2", reviewServiceNonElectronic2);
+ 		}
+ 		
+ 		// grading option
+@@ -1233,6 +1239,7 @@
+ 		User user = (User) state.getAttribute(STATE_USER);
+ 		String currentAssignmentReference = (String) state.getAttribute(VIEW_SUBMISSION_ASSIGNMENT_REFERENCE);
+ 		AssignmentSubmission s = null;
++		boolean newAttachments = false;
+ 		
+ 		Assignment assignment = getAssignment(currentAssignmentReference, "build_student_view_submission_context", state);
+ 		
+@@ -1240,6 +1247,11 @@
+ 		{
+ 			context.put("assignment", assignment);
+ 			context.put("canSubmit", Boolean.valueOf(AssignmentService.canSubmit(contextString, assignment)));
++			// SAK-26322	--bbailla2
++			if (assignment.getContent().getAllowReviewService())
++			{
++				context.put("plagiarismNote", rb.getFormattedMessage("gen.yoursubwill", new Object[]{contentReviewService.getServiceName()}));
++			}
+ 			if (assignment.getContent().getTypeOfSubmission() == Assignment.NON_ELECTRONIC_ASSIGNMENT_SUBMISSION)
+ 			{
+ 				context.put("nonElectronicType", Boolean.TRUE);
+@@ -1250,6 +1262,7 @@
+                 submitter = user;
+             }
+             s = getSubmission(assignment.getReference(), submitter, "build_student_view_submission_context", state);
++			List currentAttachments = (List) state.getAttribute(ATTACHMENTS);
+ 
+ 			if (s != null)
+ 			{
+@@ -1272,8 +1285,19 @@
+ 				
+ 				// put the resubmit information into context
+ 				assignment_resubmission_option_into_context(context, state);
++
++				// figure out if attachments have been modified
++
++				// the attachments from the previous submission
++				List submittedAttachments = s.getSubmittedAttachments();
++				newAttachments = areAttachmentsNew(submittedAttachments, currentAttachments);
+ 			}
+-			
++			else
++			{
++				// There is no previous submission, attachments are modified if anything has been uploaded
++				newAttachments = currentAttachments != null && !currentAttachments.isEmpty();
++			}
++
+ 			// can the student view model answer or not
+ 			canViewAssignmentIntoContext(context, assignment, s);
+ 		}
+@@ -1293,7 +1317,8 @@
+ 		context.put("name_submission_honor_pledge_yes", VIEW_SUBMISSION_HONOR_PLEDGE_YES);
+ 		context.put("value_submission_honor_pledge_yes", state.getAttribute(VIEW_SUBMISSION_HONOR_PLEDGE_YES));
+ 		context.put("honor_pledge_text", ServerConfigurationService.getString("assignment.honor.pledge", rb.getString("gen.honple2")));
+-		context.put("attachments", state.getAttribute(ATTACHMENTS));
++		context.put("attachments", stripInvisibleAttachments(state.getAttribute(ATTACHMENTS)));
++		context.put("new_attachments", newAttachments);
+ 		
+ 		context.put("contentTypeImageService", state.getAttribute(STATE_CONTENT_TYPE_IMAGE_SERVICE));
+ 		context.put("currentTime", TimeService.newTime());
+@@ -1330,6 +1355,76 @@
+ 	} // build_student_view_submission_context
+ 
+ 	/**
++	 * Determines if there are new attachments
++	 * @return true if currentAttachments is not empty and isn't equal to oldAttachments
++	 */
++	private boolean areAttachmentsNew(List oldAttachments, List currentAttachments)
++	{
++		if (currentAttachments == null || currentAttachments.isEmpty())
++		{
++			//there are no current attachments
++			return false;
++		}
++		if (oldAttachments == null || oldAttachments.isEmpty())
++		{
++			//there are no old attachments (and there are new ones)
++			return true;
++		}
++
++		Set<String> ids1 = getIdsFromReferences(oldAttachments);
++		Set<String> ids2 = getIdsFromReferences(currentAttachments);
++
++		//.equals on Sets of Strings will compare .equals on the contained Strings
++		return !ids1.equals(ids2);
++	}
++
++	/**
++	 * Gets ids from a list of Reference objects. If the List contains any non-reference objects, they are skipped
++	 */
++	private Set<String> getIdsFromReferences(List references)
++	{
++		Set<String> ids = new HashSet<String>();
++		for (Object reference : references)
++		{
++			if (reference instanceof Reference)
++			{
++				Reference casted = (Reference) reference;
++				ids.add(casted.getId());
++			}
++		}
++
++		return ids;
++	}
++
++	/**
++	 * Returns a clone of the passed in List of attachments minus any attachments that should not be displayed in the UI
++	 */
++	private List stripInvisibleAttachments(Object attachments)
++	{
++		List stripped = new ArrayList();
++		if (attachments == null || !(attachments instanceof List))
++		{
++			return stripped;
++		}
++		Iterator itAttachments = ((List) attachments).iterator();
++		while (itAttachments.hasNext())
++		{
++			Object next = itAttachments.next();
++			if (next instanceof Reference)
++			{
++				Reference attachment = (Reference) next;
++				// inline submissions should not show up in the UI's lists of attachments
++				if (!"true".equals(attachment.getProperties().getProperty(AssignmentSubmission.PROP_INLINE_SUBMISSION)))
++				{
++					stripped.add(attachment);
++				}
++			}
++		}
++		return stripped;
++	}
++
++
++	/**
+ 	 * build the student view of showing an assignment submission confirmation
+ 	 */
+ 	protected String build_student_view_submission_confirmation_context(VelocityPortlet portlet, Context context, RunData data,
+@@ -1406,7 +1501,7 @@
+ 				List attachments = s.getSubmittedAttachments();
+ 				if (attachments != null && attachments.size()>0)
+ 				{
+-					context.put("submit_attachments", s.getSubmittedAttachments());
++					context.put("submit_attachments", s.getVisibleSubmittedAttachments());
+ 				}
+ 				context.put("submit_text", StringUtils.trimToNull(s.getSubmittedText()));
+ 				context.put("email_confirmation", Boolean.valueOf(ServerConfigurationService.getBoolean("assignment.submission.confirmation.email", true)));
+@@ -1499,7 +1594,7 @@
+ 		context.put("text", state.getAttribute(PREVIEW_SUBMISSION_TEXT));
+ 		context.put("honor_pledge_yes", state.getAttribute(PREVIEW_SUBMISSION_HONOR_PLEDGE_YES));
+ 		context.put("honor_pledge_text", ServerConfigurationService.getString("assignment.honor.pledge", rb.getString("gen.honple2")));
+-		context.put("attachments", state.getAttribute(PREVIEW_SUBMISSION_ATTACHMENTS));
++		context.put("attachments", stripInvisibleAttachments(state.getAttribute(PREVIEW_SUBMISSION_ATTACHMENTS)));
+ 		context.put("contentTypeImageService", state.getAttribute(STATE_CONTENT_TYPE_IMAGE_SERVICE));
+ 
+ 		String template = (String) getContext(data).get("template");
+@@ -4279,8 +4374,8 @@
+ 				// SAK-23817: return to the Assignments List by Student
+ 				state.setAttribute(FROM_VIEW, MODE_INSTRUCTOR_VIEW_STUDENTS_ASSIGNMENT);
+ 				try {
++					u = UserDirectoryService.getUser(studentId);
+ 					submitter = u;
+-					u = UserDirectoryService.getUser(studentId);
+ 				} catch (UserNotDefinedException ex1) {
+ 					M_log.warn("Unable to find user with ID [" + studentId + "]");
+ 					submitter = null;
+@@ -4300,6 +4395,21 @@
+ 					}
+ 					state.setAttribute(VIEW_SUBMISSION_HONOR_PLEDGE_YES, honorPledgeYes);
+ 				}
++
++				// SAK-26322	--bbailla2
++				List nonInlineAttachments = getNonInlineAttachments(state, a);
++				int typeOfSubmission = a.getContent().getTypeOfSubmission();
++				if (typeOfSubmission == Assignment.SINGLE_ATTACHMENT_SUBMISSION && nonInlineAttachments.size() >1)
++				{
++					//Single uploaded file and there are multiple attachments
++					adjustAttachmentsToSingleUpload(data, state, a, nonInlineAttachments);
++				}
++
++				// clear text if submission type does not allow it
++				if (typeOfSubmission == Assignment.SINGLE_ATTACHMENT_SUBMISSION || typeOfSubmission == Assignment.ATTACHMENT_ONLY_ASSIGNMENT_SUBMISSION)
++				{
++					text = null;
++				}
+ 				
+ 				// get attachment input and generate alert message according to assignment submission type
+ 				checkSubmissionTextAttachmentInput(data, state, a, text);
+@@ -4443,37 +4553,59 @@
+ 						
+ 						sEdit.setAssignment(a);
+ 
++						// SAK-26322	--bbailla2
++						List nonInlineAttachments = getNonInlineAttachments(state, a);
++						if (nonInlineAttachments != null && a.getContent().getTypeOfSubmission() == 5)
++						{
++							//clear out inline attachments for content-review
++							//filter the attachment sin the state to exclude inline attachments (nonInlineAttachments, is a subset of what's currently in the state)
++							state.setAttribute(ATTACHMENTS, nonInlineAttachments);
++						}
++
+ 						// add attachments
+ 						List attachments = (List) state.getAttribute(ATTACHMENTS);
+ 						if (attachments != null)
+ 						{
+-							
+-							//Post the attachments before clearing so that we don't sumbit duplicate attachments
+-							//Check if we need to post the attachments
+-							if (a.getContent().getAllowReviewService()) {
 -								if (!attachments.isEmpty()) { 
 -									sEdit.postAttachment(attachments);
-+								if (!attachments.isEmpty() || (contentReviewService.acceptInlineAndMultipleAttachments() && sEdit.getSubmittedText() != null && !"".equals(sEdit.getSubmittedText().trim()))) { 
-+									sEdit.postAssignmentToContentReviewService(sEdit.getSubmittedText(), attachments);
++							if (a.getContent().getTypeOfSubmission() == Assignment.TEXT_ONLY_ASSIGNMENT_SUBMISSION)
++							{
++								//inline only doesn't accept attachments
++								sEdit.clearSubmittedAttachments();
++							}
++							else
++							{
++								//Post the attachments before clearing so that we don't sumbit duplicate attachments
++								//Check if we need to post the attachments
++								if (a.getContent().getAllowReviewService()) {
++									if (!attachments.isEmpty()) { 
++										sEdit.postAttachment(attachments);
++									}
  								}
+-							}
+-															 
+-							// clear the old attachments first
+-							sEdit.clearSubmittedAttachments();
++																 
++								// clear the old attachments first
++								sEdit.clearSubmittedAttachments();
+ 
+-							// add each new attachment
+-							if (submitter != null) {
+-								sPropertiesEdit.addProperty(AssignmentSubmission.SUBMITTER_USER_ID, submitter.getId());
+-								state.setAttribute(STATE_SUBMITTER, u.getId());
+-							} else {
+-								sPropertiesEdit.removeProperty(AssignmentSubmission.SUBMITTER_USER_ID);
++								// add each new attachment
++								if (submitter != null) {
++									sPropertiesEdit.addProperty(AssignmentSubmission.SUBMITTER_USER_ID, submitter.getId());
++									state.setAttribute(STATE_SUBMITTER, u.getId());
++								} else {
++									sPropertiesEdit.removeProperty(AssignmentSubmission.SUBMITTER_USER_ID);
++								}
++								
++								Iterator it = attachments.iterator();
++								while (it.hasNext())
++								{
++									sEdit.addSubmittedAttachment((Reference) it.next());
++								}
  							}
- 															 
-@@ -4506,7 +4511,7 @@
+-							
+-							Iterator it = attachments.iterator();
+-							while (it.hasNext())
+-							{
+-								sEdit.addSubmittedAttachment((Reference) it.next());
+-							}
+ 						}
+ 
++						// SAK-26322 - add inline as an attachment for the content review service	--bbailla2
++						if (a.getContent().getAllowReviewService() && !isHtmlEmpty(text))
++						{
++							prepareInlineForContentReview(text, sEdit, state, submitter);
++						}
++
+ 						if (submitter != null) {
+                             sPropertiesEdit.addProperty(AssignmentSubmission.SUBMITTER_USER_ID, submitter.getId());
+                             state.setAttribute(STATE_SUBMITTER, u.getId());
+@@ -4502,6 +4634,13 @@
+ 	
+ 							// add attachments
+ 							List attachments = (List) state.getAttribute(ATTACHMENTS);
++
++							// SAK-26322 - add inline as an attachment for the content review service	--bbailla2
++							if (a.getContent().getAllowReviewService() && !isHtmlEmpty(text))
++							{
++								prepareInlineForContentReview(text, edit, state, submitter);
++							}
++							
+ 							if (attachments != null)
  							{
  	 							// add each attachment
- 								if ((!attachments.isEmpty()) && a.getContent().getAllowReviewService()) 
--									edit.postAttachment(attachments);								
-+									edit.postAssignmentToContentReviewService(edit.getSubmittedText(), attachments);			
- 								
- 								// add each attachment
- 								Iterator it = attachments.iterator();
+@@ -4546,9 +4685,210 @@
+ 
+ 	} // post_save_submission
+ 
++	/**
++	 * Takes the inline submission, prepares it as an attachment to the submission and queues the attachment with the content review service
++	 * @author bbailla2
++	 */
++	private void prepareInlineForContentReview(String text, AssignmentSubmissionEdit edit, SessionState state, User submitter)
++	{
++		//We will be replacing the inline submission's attachment
++		//firstly, disconnect any existing attachments with AssignmentSubmission.PROP_INLINE_SUBMISSION set
++		List attachments = edit.getSubmittedAttachments();
++		List toRemove = new ArrayList();
++		Iterator itAttachments = attachments.iterator();
++		while (itAttachments.hasNext())
++		{
++			Reference attachment = (Reference) itAttachments.next();
++			ResourceProperties attachProps = attachment.getProperties();
++			if ("true".equals(attachProps.getProperty(AssignmentSubmission.PROP_INLINE_SUBMISSION)))
++			{
++				toRemove.add(attachment);
++			}
++		}
++		Iterator itToRemove = toRemove.iterator();
++		while (itToRemove.hasNext())
++		{
++			Reference attachment = (Reference) itToRemove.next();
++			edit.removeSubmittedAttachment(attachment);
++		}
++		
++		//now prepare the new resource
++		//provide lots of info for forensics - filename=InlineSubmission_siteId_assignmentId_userDisplayId_(on ehalf of)_date.html
++		String currentDisplayName = UserDirectoryService.getCurrentUser().getDisplayId();
++		String siteId = (String) state.getAttribute(STATE_CONTEXT_STRING);
++		SimpleDateFormat dform = ((SimpleDateFormat) DateFormat.getDateInstance());
++		//avoid semicolons in filenames, right?
++		dform.applyPattern("yyyy-MM-dd_HH-mm-ss");
++		StringBuilder sb_resourceId = new StringBuilder("InlineSub_");
++		String u = "_";
++		sb_resourceId.append(edit.getAssignmentId()).append(u).append(currentDisplayName).append(u);
++		if (submitter != null)
++		{
++			sb_resourceId.append("for_").append(submitter.getDisplayId()).append(u);
++		}
++		sb_resourceId.append(dform.format(new Date()));
+ 
++		String fileExtension = ".html";
++
++		/* 
++		 * TODO: add and use a method in ContentHostingService to get the length of the ID of an attachment collection
++		 * Attachment collections currently look like this:
++		 * /attachment/dc126c4a-a48f-42a6-bda0-cf7b9c4c5c16/Assignments/eac7212a-9597-4b7d-b958-89e1c47cdfa7/
++		 * See BaseContentService.addAttachmentResource for more information
++		 */
++		String toolName = "Assignments";
++		// TODO: add and use a method in IdManager to get the maxUuidLength
++		int maxUuidLength = 36;
++		int esl = Entity.SEPARATOR.length();
++		int attachmentCollectionLength = ContentHostingService.ATTACHMENTS_COLLECTION.length() + siteId.length() + esl + toolName.length() + esl + maxUuidLength + esl;
++		int maxChars = ContentHostingService.MAXIMUM_RESOURCE_ID_LENGTH - attachmentCollectionLength - fileExtension.length() - 1;
++		String resourceId = StringUtils.substring(sb_resourceId.toString(), 0, maxChars) + fileExtension;
++
++		ResourcePropertiesEdit inlineProps = m_contentHostingService.newResourceProperties();
++		inlineProps.addProperty(ResourceProperties.PROP_DISPLAY_NAME, rb.getString("submission.inline"));
++		inlineProps.addProperty(ResourceProperties.PROP_DESCRIPTION, resourceId);
++		inlineProps.addProperty(AssignmentSubmission.PROP_INLINE_SUBMISSION, "true");
++
++		//create a byte array input stream
++		//text is almost in html format, but it's missing the start and ending tags
++		//(Is this always the case? Does the content review service care?)
++		String toHtml = "<html><head></head><body>" + text + "</body></html>";
++		InputStream contentStream = new ByteArrayInputStream(toHtml.getBytes());
++
++		String contentType = "text/html";
++
++		//duplicating code from doAttachUpload. TODO: Consider refactoring into a method
++
++		SecurityAdvisor sa = new SecurityAdvisor()
++		{
++			public SecurityAdvice isAllowed(String userId, String function, String reference)
++			{
++				if(function.equals(m_contentHostingService.AUTH_RESOURCE_ADD)){
++					return SecurityAdvice.ALLOWED;
++				}else if(function.equals(m_contentHostingService.AUTH_RESOURCE_WRITE_ANY)){
++					return SecurityAdvice.ALLOWED;
++				}else{
++					return SecurityAdvice.PASS;
++				}
++			}
++		};
++		try
++		{
++			m_securityService.pushAdvisor(sa);
++			ContentResource attachment = m_contentHostingService.addAttachmentResource(resourceId, siteId, toolName, contentType, contentStream, inlineProps);
++			// TODO: need to put this file in some kind of list to improve performance with web service impls of content-review service	--bbailla2
++			String contentUserId = UserDirectoryService.getCurrentUser().getId();
++			if(submitter != null){
++				//this is a submission on behalf of a student, so grab that student's id instead
++				contentUserId = submitter.getId();
++			}
++			contentReviewService.queueContent(contentUserId, siteId, edit.getAssignment().getReference(), Arrays.asList(attachment));
++
++			try
++			{
++				Reference ref = EntityManager.newReference(m_contentHostingService.getReference(attachment.getId()));
++				edit.addSubmittedAttachment(ref);
++			}
++			catch (Exception e)
++			{
++				M_log.warn(this + "prepareInlineForContentReview() cannot find reference for " + attachment.getId() + e.getMessage());
++			}
++		}
++		catch (PermissionException e)
++		{
++			addAlert(state, rb.getString("notpermis4"));
++		}
++		catch (RuntimeException e)
++		{
++			if (m_contentHostingService.ID_LENGTH_EXCEPTION.equals(e.getMessage()))
++			{
++				addAlert(state, rb.getFormattedMessage("alert.toolong", new String[]{resourceId}));
++			}
++		}
++		catch (ServerOverloadException e)
++		{
++			M_log.debug(this + ".prepareInlineForContentReview() ***** DISK IO Exception ***** " + e.getMessage());
++			addAlert(state, rb.getString("failed.diskio"));
++		}
++		catch (Exception ignore)
++		{
++			M_log.debug(this + ".prepareInlineForContentReview() ***** Unknown Exception ***** " + ignore.getMessage());
++			addAlert(state, rb.getString("failed"));
++		}
++		finally
++		{
++			m_securityService.popAdvisor(sa);
++		}
++	}
++
++	/**
++	 * Used when students are selecting from a list of previous attachments for their single uploaded file
++	 * @author bbailla2
++	 */
++	private void adjustAttachmentsToSingleUpload(RunData data, SessionState state, Assignment a, List nonInlineAttachments)
++	{
++		if (a == null || a.getContent() == null || a.getContent().getTypeOfSubmission() != 5)
++		{
++			throw new IllegalArgumentException("adjustAttachmentsToSingleUpload called, but the assignment type is not Single Uploaded File");
++		}
++		if (nonInlineAttachments == null)
++		{
++			throw new IllegalArgumentException("adjustAttachmentsToSingleUpload called, but nonInlineAttachments is null");
++		}
++		
++		String selection = data.getParameters().get("attachmentSelection");
++		if ("newAttachment".equals(selection))
++		{
++			Reference attachment = (Reference) state.getAttribute("newSingleUploadedFile");
++			if (attachment != null)
++			{
++				List attachments = EntityManager.newReferenceList();
++				attachments.add(attachment);
++				state.setAttribute(ATTACHMENTS, attachments);
++				state.removeAttribute("newSingleUploadedFile");
++				state.removeAttribute(VIEW_SUBMISSION_TEXT);
++			}
++			// ^ if attachment is null, we don't care - checkSubmissionTextAttachmentInput() handles that for us
++		}
++		else
++		{
++			//they selected a previous attachment. selection represents an index in the nonInlineAttachments list
++			boolean error = false;
++			int index = -1;
++			try
++			{
++				//get the selected attachment
++				index = Integer.parseInt(selection);
++				if (nonInlineAttachments.size() <= index)
++				{
++					error = true;
++				}
++			}
++			catch (NumberFormatException nfe)
++			{
++				error = true;
++			}
++
++			if (error)
++			{
++				M_log.warn("adjustAttachmentsToSingleUpload() - couldn't parse the selected index as an integer, or the selected index wasn't in the range of attachment indices");
++				//checkSubmissionTextAttachmentInput() handles the alert message for us
++			}
++			else
++			{
++				Reference attachment = (Reference) nonInlineAttachments.get(index);
++				//remove all the attachments from the state and add the selected one back for resubmission
++				List attachments = (List) state.getAttribute(ATTACHMENTS);
++				attachments.clear();
++				attachments.add(attachment);
++			}
++		}
++	}
++
+ 	private void checkSubmissionTextAttachmentInput(RunData data,
+ 			SessionState state, Assignment a, String text) {
++		// SAK-26329 - determine if the submission has text	--bbailla2
++		boolean textIsEmpty = isHtmlEmpty(text);
+ 		if (a != null)
+ 		{
+ 			// check the submission inputs based on the submission type
+@@ -4556,7 +4896,7 @@
+ 			if (submissionType == 1)
+ 			{
+ 				// for the inline only submission
+-				if (text.length() == 0)
++				if (textIsEmpty)
+ 				{
+ 					addAlert(state, rb.getString("youmust7"));
+ 				}
+@@ -4564,25 +4904,64 @@
+ 			else if (submissionType == 2)
+ 			{
+ 				// for the attachment only submission
+-				List v = (List) state.getAttribute(ATTACHMENTS);
++				List v = getNonInlineAttachments(state, a);
+ 				if ((v == null) || (v.size() == 0))
+ 				{
+ 					addAlert(state, rb.getString("youmust1"));
+ 				}
+ 			}
+-			else if (submissionType == 3)
++			else
+ 			{	
+-				// for the inline and attachment submission
+-				List v = (List) state.getAttribute(ATTACHMENTS);
+-				if ((text.length() == 0 || "<br/>".equals(text)) && ((v == null) || (v.size() == 0)))
++				// for the inline and attachment submission / other submission types
++				// There must be at least one thing submitted: inline text or at least one attachment
++				List v = getNonInlineAttachments(state, a);
++				if (textIsEmpty && (v == null || v.size() == 0))
+ 				{
+ 					addAlert(state, rb.getString("youmust2"));
+ 				}
+ 			}
+ 		}
+ 	}
+-	
++
+ 	/**
++	 * When using content review, inline text gets turned into an attachment. This method returns all the attachments that do not represent inline text
++	 * @author bbailla2
++	 */
++	private List getNonInlineAttachments(SessionState state, Assignment a)
++	{
++		List attachments = (List) state.getAttribute(ATTACHMENTS);
++		List nonInlineAttachments = new ArrayList();
++		nonInlineAttachments.addAll(attachments);
++		if (a.getContent().getAllowReviewService())
++		{
++			Iterator itAttachments = attachments.iterator();
++			while (itAttachments.hasNext())
++			{
++				Object next = itAttachments.next();
++				if (next instanceof Reference)
++				{
++					Reference attachment = (Reference) next;
++					if ("true".equals(attachment.getProperties().getProperty(AssignmentSubmission.PROP_INLINE_SUBMISSION)))
++					{
++						nonInlineAttachments.remove(attachment);
++					}
++				}
++			}
++		}
++		return nonInlineAttachments;
++	}
++
++	// SAK-26329
++	/**
++	 * Parses html and determines whether it contains printable characters. 
++	 * @author bbailla2
++	 */
++	private boolean isHtmlEmpty(String html)
++	{
++		return html == null ? true : html.isEmpty();
++	}
++
++	/**
+ 	 * Action is to confirm the submission and return to list view
+ 	 */
+ 	public void doConfirm_assignment_submission(RunData data)
+@@ -4761,7 +5140,15 @@
+ 		String b;
+ 		// set whether we use the review service or not
+ 		if (r == null) b = Boolean.FALSE.toString();
+-		else b = Boolean.TRUE.toString();
++		else 
++		{
++			b = Boolean.TRUE.toString();
++			if (state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE).equals(Assignment.NON_ELECTRONIC_ASSIGNMENT_SUBMISSION))
++			{
++				//can't use content-review with non-electronic submissions
++				addAlert(state, rb.getFormattedMessage("review.switch.ne.1", new Object[]{contentReviewService.getServiceName()}));
++			}
++		}
+ 		state.setAttribute(NEW_ASSIGNMENT_USE_REVIEW_SERVICE, b);
+ 		
+ 		//set whether students can view the review service results
+@@ -5523,8 +5910,6 @@
+ 		String assignmentId = params.getString("assignmentId");
+ 		String assignmentContentId = params.getString("assignmentContentId");
+ 		
+-		// whether this is an editing which changes non-electronic assignment to any other type?
+-		boolean bool_change_from_non_electronic = false;
+ 		// whether this is an editing which changes non-point graded assignment to point graded assignment?
+ 		boolean bool_change_from_non_point = false;
+ 		// whether there is a change in the assignment resubmission choice
+@@ -5534,7 +5919,6 @@
+ 		{
+ 			// AssignmentContent object
+ 			AssignmentContentEdit ac = editAssignmentContent(assignmentContentId, "post_save_assignment", state, true);
+-			bool_change_from_non_electronic = change_from_non_electronic(state, assignmentId, assignmentContentId, ac);
+ 			bool_change_from_non_point = change_from_non_point(state, assignmentId, assignmentContentId, ac);
+ 			
+ 			// Assignment
+@@ -5583,11 +5967,9 @@
+ 			String associateGradebookAssignment = (String) state.getAttribute(AssignmentService.PROP_ASSIGNMENT_ASSOCIATE_GRADEBOOK_ASSIGNMENT);
+ 			
+ 			String allowResubmitNumber = state.getAttribute(AssignmentSubmission.ALLOW_RESUBMIT_NUMBER) != null?(String) state.getAttribute(AssignmentSubmission.ALLOW_RESUBMIT_NUMBER):null;
+-			if (ac != null && ac.getTypeOfSubmission() == Assignment.NON_ELECTRONIC_ASSIGNMENT_SUBMISSION)
+-			{
+-				// resubmit option is not allowed for non-electronic type
+-				allowResubmitNumber = null;
+-			}
++
++			// SAK-26319 - we no longer clear the resubmit number for non electronic submissions; the instructor may switch to another submission type in the future	--bbailla2
++
+ 			
+ 			boolean useReviewService = "true".equalsIgnoreCase((String) state.getAttribute(NEW_ASSIGNMENT_USE_REVIEW_SERVICE));
+ 			
+@@ -5646,8 +6028,11 @@
+ 				// old close time
+ 				oldCloseTime = a.getCloseTime();
+ 				
++				//assume creating the assignment with the content review service will be successful
++				state.setAttribute("contentReviewSuccess", Boolean.TRUE);
++
+ 				// commit the changes to AssignmentContent object
+-				commitAssignmentContentEdit(state, ac, title, submissionType,useReviewService,allowStudentViewReport, gradeType, gradePoints, description, checkAddHonorPledge, attachments, submitReviewRepo, generateOriginalityReport, checkTurnitin, checkInternet, checkPublications, checkInstitution, openTime, dueTime, closeTime);
++				commitAssignmentContentEdit(state, ac, a.getReference(), title, submissionType,useReviewService,allowStudentViewReport, gradeType, gradePoints, description, checkAddHonorPledge, attachments, submitReviewRepo, generateOriginalityReport, checkTurnitin, checkInternet, checkPublications, checkInstitution, openTime, dueTime, closeTime);
+ 				
+ 				// set the Assignment Properties object
+ 				ResourcePropertiesEdit aPropertiesEdit = a.getPropertiesEdit();
+@@ -5672,7 +6057,7 @@
+ 				if (post)
+ 				{
+ 					// we need to update the submission
+-					if (bool_change_from_non_electronic || bool_change_from_non_point || bool_change_resubmit_option)
++					if (bool_change_from_non_point || bool_change_resubmit_option)
+ 					{
+ 						List submissions = AssignmentService.getSubmissions(a);
+ 						if (submissions != null && submissions.size() >0)
+@@ -5685,13 +6070,8 @@
+ 								if (sEdit != null)
+ 								{
+ 									ResourcePropertiesEdit sPropertiesEdit = sEdit.getPropertiesEdit();
+-									if (bool_change_from_non_electronic)
++									if (bool_change_from_non_point)
+ 									{
+-										sEdit.setSubmitted(false);
+-										sEdit.setTimeSubmitted(null);
+-									}
+-									else if (bool_change_from_non_point)
+-									{
+ 										// set the grade to be empty for now
+ 										sEdit.setGrade("");
+ 										sEdit.setGraded(false);
+@@ -5991,25 +6371,6 @@
+ 	/**
+ 	 * 
+ 	 */
+-	private boolean change_from_non_electronic(SessionState state, String assignmentId, String assignmentContentId, AssignmentContentEdit ac) 
+-	{
+-		// whether this is an editing which changes non-electronic assignment to any other type?
+-		if (StringUtils.trimToNull(assignmentId) != null && StringUtils.trimToNull(assignmentContentId) != null)
+-		{
+-			// editing
+-			if (ac.getTypeOfSubmission() == Assignment.NON_ELECTRONIC_ASSIGNMENT_SUBMISSION
+-					&& ((Integer) state.getAttribute(NEW_ASSIGNMENT_SUBMISSION_TYPE)).intValue() != Assignment.NON_ELECTRONIC_ASSIGNMENT_SUBMISSION)
+-			{
+-				// changing from non-electronic type
+-				return true;
+-			}
+-		}
+-		return false;
+-	}
+-	
+-	/**
+-	 * 
+-	 */
+ 	private boolean change_from_non_point(SessionState state, String assignmentId, String assignmentContentId, AssignmentContentEdit ac) 
+ 	{
+ 		// whether this is an editing which changes non point_grade type to point grade type?
+@@ -6578,6 +6939,17 @@
+ 			}
+ 		}
+ 
++		if (Boolean.TRUE.equals(state.getAttribute("contentReviewSuccess")))
++		{
++			// post the assignment if appropriate
++			a.setDraft(!post);
++		}
++		else
++		{
++			// setup for content review failed, save as a draft
++			a.setDraft(true);
++		}
++
+ 		// post the assignment
+ 		a.setDraft(!post);
+ 
+@@ -6654,7 +7026,7 @@
+ 		}
+ 	}
+ 
+-	private void commitAssignmentContentEdit(SessionState state, AssignmentContentEdit ac, String title, int submissionType,boolean useReviewService, boolean allowStudentViewReport, int gradeType, String gradePoints, String description, String checkAddHonorPledge, List attachments, String submitReviewRepo, String generateOriginalityReport, boolean checkTurnitin, boolean checkInternet, boolean checkPublications, boolean checkInstitution, Time openTime, Time dueTime, Time closeTime) 
++	private void commitAssignmentContentEdit(SessionState state, AssignmentContentEdit ac, String assignmentRef, String title, int submissionType,boolean useReviewService, boolean allowStudentViewReport, int gradeType, String gradePoints, String description, String checkAddHonorPledge, List attachments, String submitReviewRepo, String generateOriginalityReport, boolean checkTurnitin, boolean checkInternet, boolean checkPublications, boolean checkInstitution, Time openTime, Time dueTime, Time closeTime) 
+ 	{
+ 		ac.setTitle(title);
+ 		ac.setInstructions(description);
+@@ -6712,12 +7084,15 @@
+ 		AssignmentService.commitEdit(ac);
+ 		
+ 		if(ac.getAllowReviewService()){
+-			createTIIAssignment(ac, openTime, dueTime, closeTime, state);
++			if (!createTIIAssignment(ac, assignmentRef, openTime, dueTime, closeTime, state))
++			{
++				state.setAttribute("contentReviewSuccess", Boolean.FALSE);
++			}
+ 		}
+ 		
+ 	}
+ 	
+-	public void createTIIAssignment(AssignmentContentEdit assign, Time openTime, Time dueTime, Time closeTime, SessionState state) {
++	public boolean createTIIAssignment(AssignmentContentEdit assign, String assignmentRef, Time openTime, Time dueTime, Time closeTime, SessionState state) {
+         Map opts = new HashMap();
+         
+         opts.put("submit_papers_to", assign.getSubmitReviewRepo());
+@@ -6734,12 +7109,25 @@
+         opts.put("dtstart", dform.format(openTime.getTime()));
+         opts.put("dtdue", dform.format(dueTime.getTime()));
+         //opts.put("dtpost", dform.format(closeTime.getTime()));       
++        opts.put("title", assign.getTitle());
++        opts.put("instructions", assign.getInstructions());
++        if(assign.getAttachments() != null && assign.getAttachments().size() > 0){
++        	List<String> attachments = new ArrayList<String>();
++        	for(Reference ref : assign.getAttachments()){
++        		attachments.add(ref.getReference());
++        	}
++        	opts.put("attachments", attachments);
++        }
+         try {
+-            contentReviewService.createAssignment(assign.getContext(), assign.getReference(), opts);
++            contentReviewService.createAssignment(assign.getContext(), assignmentRef, opts);
++			return true;
+         } catch (Exception e) {
+             M_log.error(e);
+-            state.setAttribute("alertMessage", rb.getString("content_review.error.createAssignment"));
++			String uiService = ServerConfigurationService.getString("ui.service", "Sakai");
++			String[] args = new String[]{contentReviewService.getServiceName(), uiService};
++            state.setAttribute("alertMessage", rb.getFormattedMessage("content_review.error.createAssignment", args));
+         }
++		return false;
+     }
+ 	
+ 
+@@ -11387,6 +11775,10 @@
+ 			// remove selected attachment
+ 			doRemove_attachment(data);
+ 		}
++		else if ("removeNewSingleUploadedFile".equals(option))
++		{
++			doRemove_newSingleUploadedFile(data);
++		}
+ 		else if ("upload".equals(option))
+ 		{
+ 			// upload local file
+@@ -11429,6 +11821,12 @@
+ 		}
+ 		
+ 	}
++
++	public void doRemove_newSingleUploadedFile(RunData data)
++	{
++		SessionState state = ((JetspeedRunData)data).getPortletSessionState(((JetspeedRunData)data).getJs_peid());
++		state.removeAttribute("newSingleUploadedFile");
++	}
+ 	
+ 	/**
+ 	 * return list of submission object based on the group filter/search result
+@@ -13017,7 +13415,15 @@
+ 						try
+ 						{
+ 							Reference ref = EntityManager.newReference(m_contentHostingService.getReference(attachment.getId()));
+-							attachments.add(ref);
++							if (singleFileUpload && attachments.size() > 1)
++							{
++								//SAK-26319	- the assignment type is 'single file upload' and the user has existing attachments, so they must be uploading a 'newSingleUploadedFile'	--bbailla2
++								state.setAttribute("newSingleUploadedFile", ref);
++							}
++							else
++							{
++								attachments.add(ref);
++							}
+ 						}
+ 						catch(Exception ee)
+ 						{
+Index: assignment-tool/tool/src/webapp/css/assignment.css
+===================================================================
+--- assignment-tool/tool/src/webapp/css/assignment.css	(revision 313717)
++++ assignment-tool/tool/src/webapp/css/assignment.css	(working copy)
+@@ -45,3 +45,93 @@
+ .highLightBlock{
+     background:#eee;
+ }
++
++.reportIcon
++{
++	display:inline-block;
++	width:20px;
++}
++
++.disclosureTriangle
++{
++	vertical-align:top;
++}
++
++.assignmentUnsubmittable
++{
++	background-color: #900;
++	color: #fff;
++}
++
++.assignmentUnsubmittableAttachments
++{
++	background-color: #fdd;
++}
++
++.assignmentUnsubmittable, .assignmentUnsubmittableAttachments
++{
++	border: 1px solid #900;
++	padding: 0 10px 10px;
++	margin: 1em 0;
++}
++
++.assignmentUnsubmittable h3
++{
++	color: #fff;
++}
++
++.assignmentUnsubmittable .assignmentInline
++{
++	background-color: #fff;
++	border: 1px solid #eee;
++	color: #000;
++	margin-top: 10px;
++	max-height: 300px;
++	overflow-y: auto;
++	padding: 0 10px;
++}
++
++.assignmentWarning
++{
++	background: url('/library/skin/images/error.png') no-repeat left;
++	padding-left: 2em;
++}
++
++.assignmentAttachRadio
++{
++	margin: 2px;
++	height: 2.5em;
++}
++
++.assignmentAttachRadio input, .assignmentAttachRadio img
++{
++	vertical-align: bottom;
++}
++
++.assignmentAttachRadio input[type=file]
++{
++	position: relative;
++	top: 3px;
++}
++
++.assignmentAttachmentHighlight
++{
++	background-color: #ffe;
++}
++
++.assignmentAttachBox
++{
++	background-color: #eee;
++	padding: 10px;
++}
++
++.assignmentAttachBox h3
++{
++	margin: 0;
++}
++
++.assignmentRosette
++{
++	vertical-align: middle;
++}
++
+Index: assignment-tool/tool/src/webapp/js/assignments.js
+===================================================================
+--- assignment-tool/tool/src/webapp/js/assignments.js	(revision 313717)
++++ assignment-tool/tool/src/webapp/js/assignments.js	(working copy)
+@@ -280,3 +280,36 @@
+     })
+     
+ }
++
++function highlightSelectedAttachment()
++{
++	endsWith = function(str, suffix)
++	{
++		return str.indexOf(suffix, str.length - suffix.length) !== -1;
++	}
++
++	var classSuffix = " assignmentAttachmentHighlight";
++	var radioButtons = document.getElementsByName("attachmentSelection");
++	for (i = 0; i < radioButtons.length; i++)
++	{
++		var parentDiv = radioButtons[i].parentNode;
++		if (radioButtons[i].checked)
++		{
++			if (!endsWith(parentDiv.className, classSuffix))
++			{
++				//add the highlight css class
++				parentDiv.className+=classSuffix;
++			}
++		}
++		else
++		{
++			if (endsWith(parentDiv.className, classSuffix))
++			{
++				//remove the highlight css class
++				var cn = parentDiv.className;
++				parentDiv.className=cn.substring(0, cn.length - classSuffix.length);
++			}
++		}
++	}
++}
++
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm	(revision 313698)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm	(revision 313717)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm	(working copy)
-@@ -188,7 +188,7 @@
- 				#if($allowReviewService && $assignment.getContent().AllowReviewService && $assignment.getContent().AllowStudentViewReport)
+@@ -21,6 +21,26 @@
+         setupToggleAreas('toggleAnchor', 'toggledContent', false, 'fast');
+ 		setupItemNavigator();
+     });
++
++var reportsExpanded = false;
++function handleReportsTriangleDisclosure(btn)
++{
++	var reportsDiv = document.getElementById("reportsDiv");
++	if (reportsExpanded)
++	{
++		btn.src = "#imageLink("sakai/expand.gif")";
++		btn.alt = "$tlang.getString('review.report.expand')";
++		reportsDiv.style.display="none";
++	}
++	else
++	{
++		btn.src = "#imageLink("sakai/collapse.gif")";
++		btn.alt = "$tlang.getString('review.report.collapse')";
++		reportsDiv.removeAttribute("style");
++		resizeFrame();
++	}
++	reportsExpanded = !reportsExpanded;
++}
+ </script>
+ <div class="portletBody">
+ <ul class="navIntraTool actionToolBar">
+@@ -185,20 +205,46 @@
+ 					</td>
+ 				</tr>
+ 			#end
+-				#if($allowReviewService && $assignment.getContent().AllowReviewService && $assignment.getContent().AllowStudentViewReport)
++				#if($allowReviewService && $assignment.getContent().AllowReviewService)
  					<tr>
  						<th>
 -							$tlang.getString("review.report")
@@ -410,11 +1592,184 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  						</th>
  							<td>
  							#if (!$submission)
+                                 				$tlang.getString("review.notavail")
+-                            				#elseif ($submission.getReviewReport().equals("Error"))
+-								<div class="alertMessage" >$!submission.getReviewError()</div>
+ 							#else
+-								<img src="$submission.getReviewIconUrl()" alt="$submission.getReviewScore()">
+-							
+-								<a href="$submission.getReviewReport()" target="_blank">$tlang.getString("review.viewreport")</a>
++								#set($reviewResults=$submission.ContentReviewResults)
++								#if ($reviewResults.size() >= 3)
++									<div class="discTria">
++										<input class="disclosureTriangle" type="image" onclick="handleReportsTriangleDisclosure(this); return false;" src="#imageLink("sakai/expand.gif")" alt="$tlang.getString('review.report.expand')"/>
++										## TODO: reconsider for i18n:
++										$reviewResults.size() $tlang.getString("review.reports")
++									</div>
++									<div id="reportsDiv" style="display:none;">
++								#end
++								#foreach ($reviewResult in $reviewResults)
++									<div>
++										#set ($props = $reviewResult.getContentResource().Properties)
++										<span class="reportIcon">
++										#if ($reviewResult.getReviewReport().equals("Error"))
++											<img src="/library/skin/images/error.png" alt="$reviewResult.getReviewError()" title="$reviewResult.getReviewError()">
++										#else
++											<a href="$reviewResult.getReviewReport()" target="_blank">
++												<img src="$reviewResult.getReviewIconURL()" alt="$reviewResult.getReviewScore()" title="$reviewResult.getReviewScore()">
++											</a>
++										#end
++										</span>
++										#if ($reviewResult.isInline())
++											$tlang.getString("submission.inline")
++										#else
++											$validator.escapeHtml($props.getPropertyFormatted($props.NamePropDisplayName))
++										#end
++									</div>
++								#end
++								#if ($reviewResults.size() >= 3)
++									</div>
++								#end
+ 							#end
+ 							</td>
+ 				
+@@ -339,22 +385,29 @@
+ 				</div>
+ 			#end
+ 			<h3>$tlang.getString("gen.subm")</h3>
+-				#if ($submissionType == 4)
++				#set($hasInline = $value_feedback.text.length() > 0)
++				#set($size = 0)
++				#if ($!submission.submitted || !$alertGradeDraft)
++					#set ($props = false)
++					#foreach ($attachment in $submission.SubmittedAttachments)
++						#set ($props = $attachment.Properties)
++						#if ($!props)
++							#set ($size = $size + 1)
++						#end
++					#end
++				#end
++				#if ($submissionType == 4 && !$hasInline && $size == 0)
+ 					## if this is non-electronic submission
+ 					<p class="instruction">$tlang.getString("nonelec_instruction2")</p>
+-				#elseif ($submissionType!=2)
+-					## if there is a text
+-## redundant
+-##					<p class="instruction">
+-##						$tlang.getString("gen.submittedtext")
+-##					</p>
++				#else
+ 					#if(($submission.submitted || !$alertGradeDraft) && $!value_feedback_text.length() >0 )
+ 						<p class="instruction">$tlang.getString("gradingsub.belisthe")</p>
+ 						<table border="0"><tr><td>
+ 						<textarea name="$name_feedback_text" id="$name_feedback_text" rows="30" wrap="virtual" cols="80">$validator.escapeHtmlFormattedTextarea($!value_feedback_text)</textarea>		
+ 						#chef_setupformattedtextarea($name_feedback_text)
+ 						</td></tr></table>
+-					#else
++					#elseif($submissionType!=2 && $submissionType!=4)
++						## This message only shows when the submission type allows submitted text and the submission doesn't contain submitted text
+ 						<p class="instruction">$tlang.getString("gradingsub.nosubmittedtext")</p>
+ 					#end
+ 					## for returned submission, show the instructor comment as well
+@@ -364,28 +417,33 @@
+ 							$cheffeedbackhelper.showPrevFeedback($cheffeedbackhelper.escapeAssignmentFeedback($!prevFeedbackText))
+ 						</div>
+ 					#end
+-				#end
+-				## submitted attachment
+-				
+-			 #if ($submissionType!=1 && $submissionType!=4) ## do not show attach messages if no attach are allowed...
+-					<h3>$tlang.getString("gen.stuatt")</h3>
+-					#set ($size = 0)
+-					#if ($!submission.submitted || !$alertGradeDraft)
+-						#set ($props = false)
+-						#foreach ($attachment in $submission.SubmittedAttachments) 
+-							#set ($props = $attachment.Properties) 
+-							#if ($!props)
+-								#set ($size = $size + 1)
++					## submitted attachment
++
++					#set ($attachAllowed = $submissionType != 1 && $submissionType != 4)
++					#if ($attachAllowed || $size != 0) ##do not show attach messages if no attach are allowed unless an attach is present anyway.
++						<h3>
++							#if ($submissionType == 5)
++								$tlang.getString("gen.stuatt.single")
++							#else
++								$tlang.getString("gen.stuatt")
+ 							#end
+-						#end
++						</h3>
+ 					#end
+-					#if ($size == 0)
+-						<p class="instruction">$tlang.getString("gen.noattsubmitted")</p>
+-					#else
++					#if ($size == 0 && $attachAllowed)
++						## only display in submission types taht are supposed to have attachments
++						<p class="instruction">
++							#if ($submissionType == 5)
++								$tlang.getString("gen.noattsubmitted.single")
++							#else
++								$tlang.getString("gen.noattsubmitted")
++							#end
++						</p>
++					#elseif ($size != 0)
++						## There are attachments. We don't care which submission type it really is, they need to be displayed
+ 						<ul class="attachList indnt1">
+-							#foreach ($attachment in $submission.SubmittedAttachments) 
++							#foreach ($attachment in $submission.VisibleSubmittedAttachments)
+ 								#set ($props = false)
+-								#set ($props = $attachment.Properties) 
++								#set ($props = $attachment.Properties)
+ 								#if ($!props)
+ 									<li>
+ 										#if ($props.getBooleanProperty($props.NamePropIsCollection))
+@@ -393,7 +451,7 @@
+ 										#else
+ 											<img src = "#imageLink($contentTypeImageService.getContentTypeImage($props.getProperty($props.NamePropContentType)))" border="0" alt="$tlang.getString("gen.filatt")" />
+ 										#end
+-										<a href="$attachment.Url" target="_blank">$validator.escapeHtml($props.getPropertyFormatted($props.NamePropDisplayName))</a>						
++										<a href="$attachment.Url" target="_blank">$validator.escapeHtml($props.getPropertyFormatted($props.NamePropDisplayName))</a>
+ 										#propertyDetails($props)
+ 									</li>
+ 								#end
+@@ -401,6 +459,7 @@
+ 						</ul>
+ 					#end
+ 				#end
++
+ 				#*					<!-- Grade types
+ 						GRADE_TYPE_NOT_SET: -1; 
+ 						UNGRADED_GRADE_TYPE: 1; 
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(revision 313698)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(revision 313717)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(working copy)
-@@ -505,7 +505,7 @@
+@@ -54,7 +54,23 @@
+ 					}
+    	}
+ 
+-
++	function handleReportsTriangleDisclosure(header, content)
++	{
++		var headerSrc = header.src;
++		var expand = "#imageLink("sakai/expand.gif")";
++		var collapse = "#imageLink("sakai/collapse.gif")";
++		if (headerSrc.indexOf(expand, headerSrc.length - expand.length) !== -1)
++		{
++			header.src = collapse;
++			content.removeAttribute("style");
++			resizeFrame();
++		}
++		else if (headerSrc.indexOf(collapse, headerSrc.length - collapse.length) !== -1)
++		{
++			header.src = expand;
++			content.style.display = "none";
++		}
++	}
+ </script>
+ 
+ <div class="portletBody">
+@@ -505,7 +521,7 @@
  					#if ($allowReviewService && $assignment.getContent().AllowReviewService)
  						<th id="reviewService">
  							<a href="#" onclick="location='#toolLinkParam("AssignmentAction" "doSort_grade_submission" "criteria=$!sort_submitReview")'; return false;" onkeypress="location='#toolLinkParam("AssignmentAction" "doSort_grade_submission" "criteria=$!sort_submitReview")'; return false;" title="$tlang.getString("gen.sorbyreview")">
@@ -423,45 +1778,128 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  								#if ($sortedBy.equals($!sort_submitReview)) 
  									#if ($sortedAsc.equals("true")) 
  										<img id="sort_ascending_review" src = "#imageLink("sakai/sortascending.gif")" border="0" alt="$tlang.getString("gen.sorasc")" /> 
-@@ -626,13 +626,14 @@
+@@ -626,16 +642,38 @@
  							#end	
  							#if ($allowReviewService && $assignment.getContent().AllowReviewService)
  								<td headers="reviewService">
 -								 #if ($submission.getReviewScore() == -1)
-+								#set ($reviewScore = $submission.getReviewScore()) 
-+								#if ($reviewScore == -1)
-                                      <div class="alertMessage" >$!submission.getReviewError()</div>
+-                                     <div class="alertMessage" >$!submission.getReviewError()</div>
 -                                 #elseif ($submission.getReviewScore() == -2)
-+                                 #elseif ($reviewScore == -2)
-                                      $tlang.getString("review.noreport")  
- 								 #else
+-                                     $tlang.getString("review.noreport")  
+-								 #else
 -								 <a href="$submission.getReviewReport()" target="_blank" title="View report: score $submission.getReviewScore()">
 -								 <img src="$submission.getReviewIconUrl()" alt="$submission.getReviewScore()">
-+								 <a href="$submission.getReviewReport()" target="_blank" title="View report: score $reviewScore">
-+								 <img src="$submission.getReviewIconUrl()" alt="$reviewScore">
- 								 </a>
- 								 #end
- 									
+-								 </a>
+-								 #end
+-									
++
++									#set($reviewResults = $submission.ContentReviewResults)
++									#if ($reviewResults.size() >= 3)
++										<div>
++											<input class="disclosureTriangle" type="image" onclick="handleReportsTriangleDisclosure(this, this.parentNode.parentNode.children[1]); return false;" src="#imageLink("sakai/expand.gif")" alt="$tlang.getString('review.report.expand')"/>
++											## TODO: reconsider for i18n:
++											$reviewResults.size() $tlang.getString("review.reports")
++										</div>
++										<div id="reportsDiv" style="display:none;">
++									#end
++									#foreach($reviewResult in $reviewResults)
++										<div>
++											#set ($props = $reviewResult.getContentResource().Properties)
++											<span class="reportIcon">
++											#if ($reviewResult.getReviewReport().equals("Error"))
++												<img src="/library/skin/images/error.png" alt="$reviewResult.getReviewError()" title="$reviewResult.getReviewError()">
++											#else
++												<a href="$reviewResult.getReviewReport()" target="_blank">
++													<img src="$reviewResult.getReviewIconURL()" alt="$reviewResult.getReviewScore()" title="$reviewResult.getReviewScore()">
++												</a>
++											#end
++											</span>
++											#if ($reviewResult.isInline())
++												$tlang.getString("submission.inline")
++											#else
++												$validator.escapeHtml($props.getPropertyFormatted($props.NamePropDisplayName))
++											#end
++										</div>
++									#end
++									#if ($reviewResults.size() >= 3)
++										</div>
++									#end
+ 								</td>
+ 							#end
+ 							<td headers="gradereleased">
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(revision 313698)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(revision 313717)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(working copy)
-@@ -509,12 +509,29 @@
- 						$reviewServiceUse
- 					</label>
- 				</div>
-+				
+@@ -356,7 +356,7 @@
+ 			<label for="subType">
+ 				$tlang.getString("gen.stusub")
+ 			</label>
+-			<select name="$name_SubmissionType" id="subType" onchange="if(document.getElementById('subType').value != 4){document.getElementById('tempAllowRes').style.display = 'block';resizeFrame();}else{document.getElementById('tempAllowRes').style.display = 'none';document.getElementById('allowResToggle').checked=false;document.getElementById('allowResubmitNumber').style.display = 'none';document.getElementById('allowResubmitTime').style.display = 'none';}" /> >
++			<select name="$name_SubmissionType" id="subType" onchange="var useReview = document.getElementById('$name_UseReviewService'); var lblUseReview = document.getElementById('lblReviewService'); var reviewSwitchNe1 = document.getElementById('review.switch.ne.1'); var reviewSwitchNe2 = document.getElementById('review.switch.ne.2'); if (document.getElementById('subType').value != 4) { reviewSwitchNe1.style.display='none'; lblReviewService.className=''; reviewSwitchNe2.style.display='none'; useReview.disabled=false; document.getElemenbById('tempAllowRes').style.display = 'block'; resizeFrame(); } else{ if (useReview.checked) { reviewSwitchNe2.style.removeProperty('display'); toggleReviewServiceOptions(this.checked); } useReview.checked=false; useReview.disabled=true; lblUseReview.className='instruction'; reviewSwitchNe1.style.removeProperty('display'); document.getElementById('tempAllowRes').style.display = 'none'; document.getElementById('allowResToggle').checked=false; document.getElementById('allowResubmitNumber').style.display = 'none'; document.getElementById('allowResubmitTime').style.display = 'none'; }" /> >
+ 				#foreach ($i in [1..$!value_totalSubmissionTypes])
+ 					#if ($i == $value_SubmissionType)
+ 						<option value="$i" selected="selected">$submissionTypeTable.get($i)</option>
+@@ -365,6 +365,7 @@
+ 					#end
+ 				#end
+ 			</select>
++			<div id="review.switch.ne.2" class="information" style="display:none;">$reviewSwitchNe2</div>
+ 		</p>
+ 		##show it only for those assignments not of type non-electronic submission
+ 		#if($!value_allowResubmitNumber && $value_SubmissionType != 4)
+@@ -497,26 +498,54 @@
+ 		#if ($allowReviewService)
+ 			<div style="display:block">
+ 				<h4>
+-				$reviewServiceName
++				$reviewServiceTitle
+ 				</h4>
+-				<div class="checkbox  indnt2">
+-					#if ($!value_UseReviewService.equals("true"))
+-						<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" checked="checked" onclick="toggleReviewServiceOptions(this.checked)"/>
+-					#else
+-						<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true"  onclick="toggleReviewServiceOptions(this.checked)"/>
+-					#end
+-					<label for="$name_UseReviewService">
+-						$reviewServiceUse
+-					</label>
+-				</div>
++				#if (4 == $value_SubmissionType)
++					<div id="review.switch.ne.1" class="information">$reviewSwitchNe1</div>
++					<div class="checkbox  indnt2">
++						#if ($!value_UseReviewService.equals("true"))
++							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" checked="checked" onclick="toggleReviewServiceOptions(this.checked)" disabled/>
++						#else
++							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true"  onclick="toggleReviewServiceOptions(this.checked)" disabled/>
++						#end
++
++						<label id="lblReviewService" for="$name_UseReviewService" class="instruction">
++							$reviewServiceUse
++						</label>
++					</div>
++				#else
++					<div id="review.switch.ne.1" class="information" style="display:none;">$reviewSwitchNe1</div>
++					<div class="checkbox indnt2">
++						#if($!value_UseReviewService.equals("true"))
++							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" checked="checked" onclick="toggleReviewServiceOptions(this.checked)"/>
++						#else
++							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" onclick="toggleReviewServiceOptions(this.checked)"/>
++						#end
++
++						<label id="lblReviewService" for="$name_UseReviewService">
++							$reviewServiceUse
++						</label>
++					</div>
++				#end
++
  				#if ($!value_UseReviewService.equals("true"))
  					<div id="reviewServiceOptions" class="indnt3">
  				#else
  					<div id="reviewServiceOptions" style="display:none" class="indnt3">
- 				#end
+-				#end
 -				
-+					#if($acceptInlineAndMultipleAttachments)
-+						$tlang.getString("review.acceptInlineAndAllAttachments")
-+					#else
-+						$tlang.getString("review.not.acceptInlineAndAllAttachments")
-+					#end
++				#end				
 +					<div class="checkbox">
 +						#if ($!value_AllowStudentView.equals("true"))
 +							<input id="$name_AllowStudentView" name="$name_AllowStudentView" type="checkbox" value="true" checked="checked" />
@@ -472,12 +1910,14 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
 +							$tlang.getString("review.allow") 
 +						</label>
 +					</div>
-+					<br/>
++					<!-- Start TII custom options -->
 +					#if($reviewServiceName.equals("Turnitin"))
  					$tlang.getString("content_review.note")
- 					
+-					
  					$tlang.getString("review.submit.papers.repository")
-@@ -542,17 +559,6 @@
+ 					<br/>
+ 					<div class="indnt1">
+@@ -542,17 +571,6 @@
  						#end
  					</div>
  					<br/>
@@ -495,19 +1935,48 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  					$tlang.getString("review.originality.check")
  					<br/>
  					<div class="indnt1">
-@@ -606,6 +612,7 @@
+@@ -605,7 +623,8 @@
+ 						</div>
  						#end
  					</div>
- 				</div>
+-				</div>
++				<!-- End TII custom options -->
 +				#end
  			</div>
  		#end
  		#if ($!withGrade && $!withGradebook)
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm	(revision 313698)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm	(revision 313717)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm	(working copy)
-@@ -115,7 +115,7 @@
+@@ -9,6 +9,26 @@
+     $(document).ready(function(){
+         setupToggleAreas('toggleAnchor', 'toggledContent', false, 'fast');
+     });
++
++var reportsExpanded = false;
++function handleReportsTriangleDisclosure(btn)
++{
++	var reportsDiv = document.getElementById("reportsDiv");
++	if (reportsExpanded)
++	{
++		btn.src="/library/image/sakai/expand.gif";
++		btn.alt="$tlang.getString('review.report.expand')";
++		reportsDiv.style.display="none";
++	}
++	else
++	{
++		btn.src="/library/image/sakai/collapse.gif";
++		btn.alt="$tlang.getString('review.report.collapse')";
++		reportsDiv.style.display="block";
++		resizeFrame();
++	}
++	reportsExpanded = !reportsExpanded;
++}
+ </script>
+ <div class="portletBody">
+ 	#set ($assignment = $submission.Assignment)
+@@ -115,17 +135,44 @@
  				#if($allowReviewService && $assignment.getContent().AllowReviewService && $assignment.getContent().AllowStudentViewReport)
  					<tr>
  						<th>
@@ -516,11 +1985,70 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_vi
  						</th>
  							<td>
  							#if (!$submission)
+ 								$tlang.getString("review.notavail")
+-							#elseif ($submission.getReviewReport().equals("Error"))
+-								<div class="alertMessage" >$!submission.getReviewError()</div>
+ 							#else
+-								<img src="$submission.getReviewIconUrl()" alt="$submission.getReviewScore()">
+-							
+-								<a href="$submission.getReviewReport()" target="_blank">$tlang.getString("review.viewreport")</a>
++								#set($reviewResults=$submission.ContentReviewResults)
++								#if ($reviewResults.size() >= 3)
++									<div class="discTria">
++										<input class="disclosureTriangle" type="image" onclick="handleReportsTriangleDisclosure(this); return false;" src="/library/image/sakai/expand.gif" alt="$tlang.getString('review.report.expand')"/>
++										## TODO: reconsider for i18n
++										$reviewResults.size() $tlang.getString("review.reports")
++									</div>
++									<div id="reportsDiv" style="display:none;">
++								#end
++								#foreach ($reviewResult in $reviewResults)
++									<div>
++										#set ($props = $reviewResult.getContentResource().Properties)
++										<span class="reportIcon">
++										
++										#if ($reviewResult.getReviewReport().equals("Error"))
++											<img src="/library/skin/images/error.png" alt="$reviewResult.getReviewError()" title="$reviewResult.getReviewError()">
++										#else
++											<a href="$reviewResult.getReviewReport()" target="_blank">
++												<img src="$reviewResult.getReviewIconURL()" alt="$reviewResult.getReviewScore()" title="$reviewResult.getReviewScore()">
++											</a>
++										#end
++										</span>
++										#if ($reviewResult.isInline())
++											$tlang.getString("submission.inline")
++										#else
++											$validator.escapeHtml($props.getPropertyFormatted($props.NamePropDisplayName))
++										#end
++									</div>
++								#end
++								#if ($reviewResults.size() >= 3)
++									</div>
++								#end
+ 							#end
+ 							</td>
+ 				
+@@ -288,7 +335,7 @@
+ 					<div class="textPanel">$submission.getSubmittedText()</div>
+ 				#end
+ 			#end
+-			#set ($submittedAttachments = $submission.SubmittedAttachments)
++			#set ($submittedAttachments = $submission.VisibleSubmittedAttachments)
+ 			#set ($size = 0)
+ 			#set ($props = false)
+ 			#foreach ($attachment in $submittedAttachments) 
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm	(revision 313698)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm	(revision 313717)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm	(working copy)
-@@ -286,7 +286,7 @@
+@@ -47,7 +47,6 @@
+ 		theForm.submit();
+ 	}
+ }
+-		
+ </script>
+ 
+ 
+@@ -286,16 +285,39 @@
  				#if($!submitted && $!timeSubmitted && $allowReviewService && $assignment.getContent().AllowReviewService && $assignment.getContent().AllowStudentViewReport)
  					<tr>
  						<th>
@@ -528,4 +2056,56 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_vi
 +							$reviewServiceName&nbsp;$tlang.getString("review.report")
  						</th>
  							<td>
- 							#if ($submission.getReviewReport().equalsIgnoreCase("Error"))
+-							#if ($submission.getReviewReport().equalsIgnoreCase("Error"))
+-								<div class="alertMessage" >$!submission.getReviewError()</div>
+-							#else
+-								<img src="$submission.getReviewIconUrl()" alt="$submission.getReviewScore()">
+-							
+-								<a href="$submission.getReviewReport()" target="_blank">$tlang.getString("review.viewreport")</a>
+-							#end
++								#set($reviewResults=$submission.ContentReviewResults)
++								#if ($reviewResults.size() >= 3)
++									<div class="discTria">
++										<input class="disclosureTriangle" type="image" onclick="handleReportsTriangleDisclosure(this); return false;" src="#imageLink("sakai/expand.gif")" alt="$tlang.getString('review.report.expand')"/>
++										$reviewResults.size() $tlang.getString("review.reports")
++									</div>
++									<div id="reportsDiv" style="display:none;">
++								#end
++								#foreach ($reviewResult in $reviewResults)
++									<div>
++										#set ($props = $reviewResult.getContentResource().Properties)
++										<span class="reportIcon">
++										#if ($reviewResult.getReviewReport().equals("Error"))
++											<img src="/library/skin/images/error.png" alt="$reviewResult.getReviewError()" title="$reviewResult.getReviewError()">
++										#else
++											<a href="$reviewResult.getReviewReport()" target="_blank">
++												<img src="$reviewResult.getReviewIconURL()" alt="$reviewResult.getReviewScore()" title="$reviewResult.getReviewScore()">
++											</a>
++										#end
++										</span>
++										#if ($reviewResult.isInline())
++											$tlang.getString("submission.inline")
++										#else
++											$validator.escapeHtml($props.getPropertyFormatted($props.NamePropDisplayName))
++										#end
++									</div>
++								#end
++								#if ($reviewResults.size() >= 3)
++									</div>
++								#end
+ 							</td>
+ 				
+ 					</tr>
+@@ -533,6 +555,12 @@
+ 									$tlang.getString("gen.theassall4")
+ 								#end
+ 							#end
++							#if ($plagiarismNote)
++								<p>
++									<img alt="$reviewIndicator" title="$reviewIndicator" src="/library/image/silk/rosette.png" class="assignmentRosette"/>
++									<em>$plagiarismNote</em>
++								</p>
++							#end
+ 							</p>
+ 							<table border="0">
+ 								<tr>

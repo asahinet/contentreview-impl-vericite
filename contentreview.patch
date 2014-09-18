@@ -2,27 +2,31 @@ Index: content-review-api/public/src/java/org/sakaiproject/contentreview/service
 ===================================================================
 --- content-review-api/public/src/java/org/sakaiproject/contentreview/service/ContentReviewService.java	(revision 313698)
 +++ content-review-api/public/src/java/org/sakaiproject/contentreview/service/ContentReviewService.java	(working copy)
-@@ -51,8 +51,7 @@
- 	 *  @param Reference to the content object that should be submitted
+@@ -47,12 +47,11 @@
+ 	 *  
+ 	 *  @param userID if nulll current user is used
+ 	 *  @param SiteId is null current site is used
+-	 *  @param Entity reference to the task this is for
+-	 *  @param Reference to the content object that should be submitted
++	 *  @param assignmentReference reference to the task this is for
++	 *  @param content list of content resources to be queued
  	 *  
  	 */
 -	public void queueContent(String userId, String siteId, String taskId, String contentId)
 -	throws QueueException;
-+	public void queueContent(String userId, String siteId, String assignmentReference, List<String> contentIds, String inlineText, long submissionTime) throws QueueException;
++	public void queueContent(String userId, String siteId, String assignmentReference, List<ContentResource> content) throws QueueException;
  	
  	/**
  	 *  Retrieve a score for a specific item
-@@ -64,37 +63,50 @@
+@@ -62,39 +61,45 @@
+ 	 * @throws ReportException
+ 	 * @throws Exception
  	  */
- 	public int getReviewScore(String contentId)
- 	throws QueueException, ReportException, Exception;
-+
+-	public int getReviewScore(String contentId)
+-	throws QueueException, ReportException, Exception;
+-	
 +	public int getReviewScore(String contentId, String assignmentRef, String userId) throws QueueException,
 +                        ReportException, Exception;
-+
-+	public String getInlineTextId(String assignmentReference, String userId, long submissionTime);
- 	
-+	public boolean acceptInlineAndMultipleAttachments();
 +
  	/**
  	 *  Get the URL of the report
