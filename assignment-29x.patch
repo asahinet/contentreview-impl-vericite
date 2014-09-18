@@ -1,6 +1,6 @@
 Index: assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmissionEdit.java
 ===================================================================
---- assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmissionEdit.java	(revision 309635)
+--- assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmissionEdit.java	(revision 313698)
 +++ assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmissionEdit.java	(working copy)
 @@ -241,5 +241,5 @@
  	 * Post attachments to the content review service
@@ -11,7 +11,7 @@ Index: assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSub
  }
 Index: assignment-bundles/resources/assignment.properties
 ===================================================================
---- assignment-bundles/resources/assignment.properties	(revision 309635)
+--- assignment-bundles/resources/assignment.properties	(revision 313698)
 +++ assignment-bundles/resources/assignment.properties	(working copy)
 @@ -618,7 +618,7 @@
  
@@ -36,7 +36,7 @@ Index: assignment-bundles/resources/assignment.properties
  ## notification email content
 Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java
 ===================================================================
---- assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java	(revision 309635)
+--- assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java	(revision 313698)
 +++ assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java	(working copy)
 @@ -9283,71 +9283,174 @@
  				return -2;
@@ -283,9 +283,9 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
 +					if(contentId != null){
 +						try{
 +							if (allowGradeSubmission(getReference())){
-+								return contentReviewService.getReviewReportInstructor(contentId, getAssignment().getReference());
++								return contentReviewService.getReviewReportInstructor(contentId, getAssignment().getReference(), UserDirectoryService.getCurrentUser().getId());
 +							}else{
-+								return contentReviewService.getReviewReportStudent(contentId, getAssignment().getReference());
++								return contentReviewService.getReviewReportStudent(contentId, getAssignment().getReference(), UserDirectoryService.getCurrentUser().getId());
 +							}
 +						} catch (QueueException e) {
 +							M_log.debug(e.getMessage(), e);
@@ -307,10 +307,10 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
  					
  					if (allowGradeSubmission(getReference()))
 -						return contentReviewService.getReviewReportInstructor(contentId);
-+						return contentReviewService.getReviewReportInstructor(contentId, getAssignment().getReference());
++						return contentReviewService.getReviewReportInstructor(contentId, getAssignment().getReference(), UserDirectoryService.getCurrentUser().getId());
  					else
 -						return contentReviewService.getReviewReportStudent(contentId);
-+						return contentReviewService.getReviewReportStudent(contentId, getAssignment().getReference());
++						return contentReviewService.getReviewReportStudent(contentId, getAssignment().getReference(), UserDirectoryService.getCurrentUser().getId());
  					
  				} catch (Exception e) {
  					M_log.warn(":getReviewReport() " + e.getMessage());
@@ -361,7 +361,7 @@ Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssign
  				{
 Index: assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java
 ===================================================================
---- assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java	(revision 309635)
+--- assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java	(revision 313698)
 +++ assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java	(working copy)
 @@ -837,7 +837,12 @@
  		// Check whether content review service is enabled, present and enabled for this site
@@ -399,7 +399,7 @@ Index: assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/Assignment
  								Iterator it = attachments.iterator();
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm	(revision 309635)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm	(revision 313698)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm	(working copy)
 @@ -188,7 +188,7 @@
  				#if($allowReviewService && $assignment.getContent().AllowReviewService && $assignment.getContent().AllowStudentViewReport)
@@ -412,7 +412,7 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  							#if (!$submission)
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(revision 309635)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(revision 313698)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(working copy)
 @@ -505,7 +505,7 @@
  					#if ($allowReviewService && $assignment.getContent().AllowReviewService)
@@ -444,7 +444,7 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  									
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(revision 309635)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(revision 313698)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(working copy)
 @@ -509,12 +509,29 @@
  						$reviewServiceUse
@@ -505,7 +505,7 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  		#if ($!withGrade && $!withGradebook)
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm	(revision 309635)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm	(revision 313698)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm	(working copy)
 @@ -115,7 +115,7 @@
  				#if($allowReviewService && $assignment.getContent().AllowReviewService && $assignment.getContent().AllowStudentViewReport)
@@ -518,7 +518,7 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_vi
  							#if (!$submission)
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm	(revision 309635)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm	(revision 313698)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm	(working copy)
 @@ -286,7 +286,7 @@
  				#if($!submitted && $!timeSubmitted && $allowReviewService && $assignment.getContent().AllowReviewService && $assignment.getContent().AllowStudentViewReport)
