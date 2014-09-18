@@ -1,16 +1,6 @@
-Index: .
-===================================================================
---- .	(revision 313717)
-+++ .	(working copy)
-
-Property changes on: .
-___________________________________________________________________
-Modified: svn:mergeinfo
-   Merged /assignment/trunk:r310555,312651-312652,313645,313682
-   Merged /assignment/branches/SAK-26318:r310368-310553
 Index: assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmission.java
 ===================================================================
---- assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmission.java	(revision 313717)
+--- assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmission.java	(revision 313719)
 +++ assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSubmission.java	(working copy)
 @@ -42,6 +42,9 @@
  	
@@ -44,9 +34,170 @@ Index: assignment-api/api/src/java/org/sakaiproject/assignment/api/AssignmentSub
 +	 */
 +	public List<ContentReviewResult> getContentReviewResults();
  }
+Index: assignment-api/api/src/java/org/sakaiproject/assignment/api/ContentReviewResult.java
+===================================================================
+--- assignment-api/api/src/java/org/sakaiproject/assignment/api/ContentReviewResult.java	(revision 0)
++++ assignment-api/api/src/java/org/sakaiproject/assignment/api/ContentReviewResult.java	(revision 0)
+@@ -0,0 +1,148 @@
++package org.sakaiproject.assignment.api;
++
++import org.sakaiproject.content.api.ContentResource;
++import org.sakaiproject.entity.api.ResourceProperties;
++
++/**
++ * Introduced for SAK-26322 
++ * A ContentReviewResult represents the results of a content review item
++ * @author bbailla2
++ */
++public class ContentReviewResult
++{
++        /**
++         * The ContentResource which was reviewed
++         */
++        private ContentResource resource;
++
++        /**
++         * The score from the content review service
++         */
++        private int reviewScore;
++        
++        /**
++         * The URL to the content review report
++         */
++        private String reviewReport;
++
++        /**
++         * The status of the review
++         */
++        private String reviewStatus;
++
++        /**
++         * The URL of the content review icon associated with this item
++         */
++        private String reviewIconURL;
++
++        /**
++         * An error string, if any, return from the review service
++         */
++        private String reviewError;
++
++
++        /**
++         * Getter for the ContentResource which was reviewed
++         */
++        public ContentResource getContentResource()
++        {
++                return resource;
++        }
++
++        /**
++         * Setter for the ContentResource which was reviewed
++         */
++        public void setContentResource(ContentResource resource)
++        {
++                this.resource = resource;
++        }
++
++        /**
++         * Determines if this ContentReview result is from a student's inline text
++         */
++        public boolean isInline()
++        {
++                ResourceProperties props = resource.getProperties();
++                return "true".equals(props.getProperty(AssignmentSubmission.PROP_INLINE_SUBMISSION));
++        }
++
++        /**
++         * Getter for score from the content review service
++         */
++        public int getReviewScore()
++        {
++                return reviewScore;
++        }
++
++        /**
++         * Setter for score form the content review service
++         */
++        public void setReviewScore(int reviewScore)
++        {
++                this.reviewScore = reviewScore;
++        }
++
++        /**
++         * Getter for URL to the content review report
++         */
++        public String getReviewReport()
++        {
++                return reviewReport;
++        }
++
++        /**
++         * Setter for URL to the content review report
++         */
++        public void setReviewReport(String reviewReport)
++        {
++                this.reviewReport = reviewReport;
++        }
++
++        /**
++         * Getter for the status of the review
++         */
++        public String getReviewStatus()
++        {
++                return reviewStatus;
++        }
++
++        /**
++         * Setter for the status of the review
++         */
++        public void setReviewStatus(String reviewStatus)
++        {
++                this.reviewStatus = reviewStatus;
++        }
++
++        /**
++         * Getter for the URL of the content review icon associated with this item
++         */
++        public String getReviewIconURL()
++        {
++                return reviewIconURL;
++        }
++
++        /**
++         * Setter for the URL of the content review icon associated with this item
++         */
++        public void setReviewIconURL(String reviewIconURL)
++        {
++                this.reviewIconURL = reviewIconURL;
++        }
++
++        /**
++         * Getter for the error string, if any, returned from the review service
++         */
++        public String getReviewError()
++        {
++                return reviewError;
++        }
++
++        /**
++         * Setter for the error string, if any, returned from the review service
++         */
++        public void setReviewError(String reviewError)
++        {
++                this.reviewError = reviewError;
++        }
++}
+
+Property changes on: assignment-api/api/src/java/org/sakaiproject/assignment/api/ContentReviewResult.java
+___________________________________________________________________
+Added: svn:keywords
+   + Date Revision Author HeadURL Id
+Added: svn:eol-style
+   + native
+
 Index: assignment-bundles/resources/assignment.properties
 ===================================================================
---- assignment-bundles/resources/assignment.properties	(revision 313717)
+--- assignment-bundles/resources/assignment.properties	(revision 313719)
 +++ assignment-bundles/resources/assignment.properties	(working copy)
 @@ -198,8 +198,9 @@
  gen.theare2       = There are no submissions.
@@ -140,452 +291,9 @@ Index: assignment-bundles/resources/assignment.properties
  
  noti.releaseresubmission.subject.content=Email notification for assignment with resubmissions allowed
  noti.releaseresubmission.text=Your submission to assignment "{0}" has been corrected and it allows resubmissions. Please go to {1} to view details.
-Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java
-===================================================================
---- assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java	(revision 313717)
-+++ assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java	(working copy)
-@@ -70,6 +70,7 @@
- import org.sakaiproject.assignment.api.AssignmentService;
- import org.sakaiproject.assignment.api.AssignmentSubmission;
- import org.sakaiproject.assignment.api.AssignmentSubmissionEdit;
-+import org.sakaiproject.assignment.api.ContentReviewResult;
- import org.sakaiproject.assignment.taggable.api.AssignmentActivityProducer;
- import org.sakaiproject.authz.api.AuthzGroup;
- import org.sakaiproject.authz.api.AuthzPermissionException;
-@@ -6544,6 +6545,12 @@
- 	 */
- 	public boolean canSubmit(String context, Assignment a)
- 	{
-+		// submissions are never allowed to non-electronic assignments	--bbailla2
-+		if (a.getContent().getTypeOfSubmission() == Assignment.NON_ELECTRONIC_ASSIGNMENT_SUBMISSION)
-+		{
-+			return false;
-+		}
-+
- 		// return false if not allowed to submit at all
- 		if (!allowAddSubmissionCheckGroups(context, a)) return false;
- 		
-@@ -9314,8 +9321,8 @@
-                         M_log.debug(this + " getReviewStatus returned a status of: " + status);
-                         return -2;
-                     }
--
--					int score = contentReviewService.getReviewScore(contentId);
-+                    String userId = (String)this.getSubmitterIds().get(0);
-+					int score = contentReviewService.getReviewScore(contentId, getAssignment().getReference(), userId);
- 					m_reviewScore = score;
- 					M_log.debug(this + " getReviewScore CR returned a score of: " + score);
- 					return score;
-@@ -9326,10 +9333,9 @@
- 					try {
- 						
- 							M_log.debug(this + " getReviewScore Item is not in queue we will try add it");
--							String contentId = cr.getId();
- 							String userId = (String)this.getSubmitterIds().get(0);
- 							try {
--								contentReviewService.queueContent(userId, null, getAssignment().getReference(), contentId);
-+								contentReviewService.queueContent(userId, this.getContext(), getAssignment().getReference(), Arrays.asList(cr));
- 							}
- 							catch (QueueException qe) {
- 								M_log.warn(" getReviewScore Unable to queue content with content review Service: " + qe.getMessage());
-@@ -9352,6 +9358,76 @@
- 	
- 			
- 		}
-+
-+		// SAK-26322	--bbailla2
-+		/**
-+		 * Essentially the same as getReviewScore() only it acts upon the ContentResource parameter rather than that which is returned by firstAcceptableAttachment().
-+		 * TODO: consider deleting getReviewScore(). If not possible, then refactor to eliminate code duplication
-+		 */
-+		private int getReviewScore(ContentResource cr)
-+		{
-+			M_log.debug(this + " getReviewScore(ContentResource) for submission " + this.getId() + " and review service is: " + (this.getAssignment().getContent().getAllowReviewService()));
-+
-+			//null check, allow review service check
-+			if (cr == null)
-+			{
-+				M_log.debug(this + " getReviewScore(ContentResource) called with cr == null");
-+				return -2;
-+			}
-+
-+			if (!this.getAssignment().getContent().getAllowReviewService())
-+			{
-+				M_log.debug(this + " getReviewScore(ContentResource) Content review is not enabled for this assignment");
-+				return -2;
-+			}
-+
-+			//get the status from the content review service, if it's in a valid status, get the score)
-+			try
-+			{
-+				String contentId = cr.getId();
-+				M_log.debug(this + " getReviewScore(ContentResource) checking for score for content: " + contentId);
-+
-+				Long status = contentReviewService.getReviewStatus(contentId);
-+				if (status != null && (status.equals(ContentReviewItem.NOT_SUBMITTED_CODE) || status.equals(ContentReviewItem.SUBMITTED_AWAITING_REPORT_CODE)))
-+				{
-+					M_log.debug(this + " getReviewStatus returned a state of: " + status);
-+					return -2;
-+				}
-+				String userId = (String)this.getSubmitterIds().get(0);
-+				int score = contentReviewService.getReviewScore(contentId, getAssignment().getReference(), userId);
-+				// TODO: delete the following line if there will be no repercussions:
-+				m_reviewScore = score;
-+				M_log.debug(this + " getReviewScore(ContentResource) CR returned a score of: " + score);
-+				return score;
-+			}
-+			catch (QueueException cie)
-+			{
-+				//should we add the item
-+				try
-+				{
-+					M_log.debug(" getReviewScore(ContentResource) Item is not in queue we will try to add it");
-+					String userId = (String)this.getSubmitterIds().get(0);
-+					try
-+					{
-+						contentReviewService.queueContent(userId, this.getContext(), getAssignment().getReference(), Arrays.asList(cr));
-+					}
-+					catch (QueueException qe)
-+					{
-+						M_log.warn(" getReviewScore(ContentResource) Unable to queue content with content review service: " + qe.getMessage());
-+					}
-+				}
-+				catch (Exception e)
-+				{
-+					e.printStackTrace();
-+				}
-+				return -1;
-+			}
-+			catch (Exception e)
-+			{
-+				M_log.warn(this + " getReviewScore " + e.getMessage());
-+				return -1;
-+			}
-+		}
- 		
- 		public String getReviewReport() {
- //			 Code to get updated report if default
-@@ -9370,11 +9446,11 @@
- 					}
- 					
- 					String contentId = cr.getId();
--					
-+					String userId = (String)this.getSubmitterIds().get(0);
- 					if (allowGradeSubmission(getReference()))
--						return contentReviewService.getReviewReportInstructor(contentId);
-+						return contentReviewService.getReviewReportInstructor(contentId, getAssignment().getReference(), userId);
- 					else
--						return contentReviewService.getReviewReportStudent(contentId);
-+						return contentReviewService.getReviewReportStudent(contentId, getAssignment().getReference(), userId);
- 					
- 				} catch (Exception e) {
- 					M_log.warn(":getReviewReport() " + e.getMessage());
-@@ -9384,7 +9460,41 @@
- 			}
- 			
- 		}
-+
-+		//SAK-26322	--bbailla2
-+		/**
-+		 * Essentially the same as getReviewReport(), only it acts upon the ContentResource that is passed rather than that which is returned from getFirstAcceptableAttachment()
-+		 * TODO: consider removing getReviewReport(). If this is not possible, eliminate code duplication
-+		 */
-+		private String getReviewReport(ContentResource cr)
-+		{
-+			if (cr == null)
-+			{
-+				M_log.debug(this.getId() + " getReviewReport(ContentResource) called with cr == null");
-+				return "Error";
-+			}
-+
-+			try
-+			{
-+				String contentId = cr.getId();
-+				String userId = (String)this.getSubmitterIds().get(0);
-+				if (allowGradeSubmission(getReference()))
-+				{
-+					return contentReviewService.getReviewReportInstructor(contentId, getAssignment().getReference(), userId);
-+				}
-+				else
-+				{
-+					return contentReviewService.getReviewReportStudent(contentId, getAssignment().getReference(), userId);
-+				}
-+			}
-+			catch (Exception e)
-+			{
-+				M_log.warn(":getReviewReport(ContentResource) " + e.getMessage());
-+				return "Error";
-+			}
-+		}
- 		
-+		//TODO: delete this and all calling methods if there are no repercussions	--bbailla2
- 		private ContentResource getFirstAcceptableAttachement() {
- 			String contentId = null;
- 			try {
-@@ -9402,6 +9512,34 @@
- 			}
- 			return null;
- 		}
-+
-+		/**
-+		 * SAK-26322
-+		 * Gets all attachments in m_submittedAttachments that are acceptable to the content review service
-+		 * @author bbailla2
-+		 */
-+		private List<ContentResource> getAllAcceptableAttachments()
-+		{
-+			List<ContentResource> attachments = new ArrayList<ContentResource>();
-+			for (int i = 0; i< m_submittedAttachments.size(); i++)
-+			{
-+				try
-+				{
-+					Reference ref = (Reference)m_submittedAttachments.get(i);
-+					ContentResource contentResource = (ContentResource)ref.getEntity();
-+					if (contentReviewService.isAcceptableContent(contentResource))
-+					{
-+						attachments.add((ContentResource)contentResource);
-+					}
-+				}
-+				catch (Exception e)
-+				{
-+					M_log.warn(":getAllAcceptableAttachments() " + e.getMessage());
-+					e.printStackTrace();
-+				}
-+			}
-+			return attachments;
-+		}
- 		
- 		public String getReviewStatus() {
- 			return m_reviewStatus;
-@@ -9463,13 +9601,117 @@
-             }
-         }
- 
-+		//SAK-26322	--bbailla2
-+		/**
-+		 * Essentially the same as getReviewError(), only it acts upon the ContentResource that is passed rather than that which is returned from getFirstAcceptableAttachment()
-+		 */
-+		private String getReviewError(ContentResource cr)
-+		{
-+			if (cr == null)
-+			{
-+				M_log.debug(this.getId() + " getReviewReport(ContentResource) called with cr == null");
-+				return null;
-+			}
-+			try
-+			{
-+				String contentId = cr.getId();
-+				//This should use getLocalizedReviewErrorMesage(contentId)
-+				//to get a i18n message of the error
-+				Long status = contentReviewService.getReviewStatus(contentId);
-+				String errorMessage = null;
- 
-+				// TODO: we can remove this null check if we use yoda statements below	--bbailla2
-+				if (status != null)
-+				{
-+					if (status.equals(ContentReviewItem.REPORT_ERROR_NO_RETRY_CODE))
-+					{
-+						errorMessage = rb.getString("content_review.error.REPORT_ERROR_NO_RETRY_CODE");
-+					}
-+					else if (status.equals(ContentReviewItem.REPORT_ERROR_RETRY_CODE))
-+					{
-+						errorMessage = rb.getString("content_review.error.REPORT_ERROR_RETRY_CODE");
-+					}
-+					else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_NO_RETRY_CODE))
-+					{
-+						errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_NO_RETRY_CODE");
-+					}
-+					else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_RETRY_CODE))
-+					{
-+						errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_RETRY_CODE");
-+					}
-+					else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_RETRY_EXCEEDED))
-+					{
-+						errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_RETRY_EXCEEDED_CODE");
-+					}
-+					else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_USER_DETAILS_CODE))
-+					{
-+						errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_USER_DETAILS_CODE");
-+					}
-+					else if (ContentReviewItem.SUBMITTED_AWAITING_REPORT_CODE.equals(status) || ContentReviewItem.NOT_SUBMITTED_CODE.equals(status))
-+					{
-+						errorMessage = rb.getString("content_review.pending.info");
-+					}
-+				}
-+
-+				if (errorMessage == null)
-+				{
-+					errorMessage = rb.getString("content_review.error");
-+				}
-+
-+				return errorMessage;
-+			}
-+			catch (Exception e)
-+			{
-+				M_log.warn(this + ":getReviewError(ContentResource) " + e.getMessage());
-+				return null;
-+			}
-+		}
-+
-+
- 		public String getReviewIconUrl() {
- 			if (m_reviewIconUrl == null )
- 				m_reviewIconUrl = contentReviewService.getIconUrlforScore(Long.valueOf(this.getReviewScore()));
- 				
- 			return m_reviewIconUrl;
- 		}
-+
-+		// SAK-26322	--bbailla2
-+		/**
-+		 * @inheritDoc
-+		 */
-+		@Override
-+		public List<ContentReviewResult> getContentReviewResults()
-+		{
-+			ArrayList<ContentReviewResult> reviewResults = new ArrayList<ContentReviewResult>();
-+
-+			//get all the attachments for this submission and populate the reviewResults
-+			List<ContentResource> contentResources = getAllAcceptableAttachments();
-+			Iterator<ContentResource> itContentResources = contentResources.iterator();
-+			while (itContentResources.hasNext())
-+			{
-+				ContentResource cr = itContentResources.next();
-+				ContentReviewResult reviewResult = new ContentReviewResult();
-+
-+				reviewResult.setContentResource(cr);
-+				int reviewScore = getReviewScore(cr);
-+				reviewResult.setReviewScore(reviewScore);
-+				reviewResult.setReviewReport(getReviewReport(cr));
-+				//skip review status, it's unused
-+				String iconUrl = contentReviewService.getIconUrlforScore(Long.valueOf(reviewScore));
-+				reviewResult.setReviewIconURL(iconUrl);
-+				reviewResult.setReviewError(getReviewError(cr));
-+
-+				if ("true".equals(cr.getProperties().getProperty(PROP_INLINE_SUBMISSION)))
-+				{
-+					reviewResults.add(0, reviewResult);
-+				}
-+				else
-+				{
-+					reviewResults.add(reviewResult);
-+				}
-+			}
-+			return reviewResults;
-+		}
- 		
- 		/**
- 		 * constructor
-@@ -10502,7 +10744,31 @@
- 			return m_submittedAttachments;
- 		}
- 
-+		//SAK-26322	--bbailla2
- 		/**
-+		 * @inheritDoc
-+		 */
-+		@Override
-+		public List getVisibleSubmittedAttachments()
-+		{
-+			List visibleAttachments = new ArrayList();
-+			if (m_submittedAttachments != null)
-+			{
-+				Iterator itAttachments = m_submittedAttachments.iterator();
-+				while (itAttachments.hasNext())
-+				{
-+					Reference attachment = (Reference) itAttachments.next();
-+					ResourceProperties props = attachment.getProperties();
-+					if (!"true".equals(props.getProperty(PROP_INLINE_SUBMISSION)))
-+					{
-+						visibleAttachments.add(attachment);
-+					}
-+				}
-+			}
-+			return visibleAttachments;
-+		}
-+
-+		/**
- 		 * Get the general comments by the grader
- 		 * 
- 		 * @return The text of the grader's comments; may be null.
-@@ -11171,23 +11437,28 @@
- 			//Send the attachment to the review service
- 
- 			try {
--				ContentResource cr = getFirstAcceptableAttachement(attachments);
--				Assignment ass = this.getAssignment();
-+				//SAK-26322	--bbailla2
-+				List<ContentResource> resources = getAllAcceptableAttachments(attachments);
-+				Assignment ass = this.getAssignment();			
- 				if (ass != null)
- 				{
--					contentReviewService.queueContent(null, null, ass.getReference(), cr.getId());
-+					String userId = (String)this.getSubmitterIds().get(0);
-+					contentReviewService.queueContent(userId, this.getContext(), ass.getReference(), resources);
- 				}
- 				else
- 				{
- 					// error, assignment couldn't be found. Log the error
- 					M_log.debug(this + " BaseAssignmentSubmissionEdit postAttachment: Unable to find assignment associated with submission id= " + this.m_id + " and assignment id=" + this.m_assignment);
- 				}
--			} catch (QueueException qe) {
-+			}
-+			catch (QueueException qe)
-+			{
- 				M_log.warn(" BaseAssignmentSubmissionEdit postAttachment: Unable to add content to Content Review queue: " + qe.getMessage());
--			} catch (Exception e) {
-+			}
-+			catch (Exception e)
-+			{
- 				e.printStackTrace();
- 			}
--
- 		}
- 
- 		private ContentResource getFirstAcceptableAttachement(List attachments) {
-@@ -11217,6 +11488,40 @@
- 			}
- 			return null;
- 		}
-+
-+		private List<ContentResource> getAllAcceptableAttachments(List attachments)
-+		{
-+			List<ContentResource> resources = new ArrayList<ContentResource>();
-+			for (int i = 0; i < attachments.size(); i++)
-+			{
-+				Reference attachment = (Reference) attachments.get(i);
-+				try
-+				{
-+					ContentResource res = m_contentHostingService.getResource(attachment.getId());
-+					if (contentReviewService.isAcceptableContent(res))
-+					{
-+						resources.add(res);
-+					}
-+				}
-+				catch (PermissionException e)
-+				{
-+					e.printStackTrace();
-+					M_log.warn(":getAllAcceptableAttachments " + e.getMessage());
-+				}
-+				catch (IdUnusedException e)
-+				{
-+					e.printStackTrace();
-+					M_log.warn(":getAllAcceptableAttachments " + e.getMessage());
-+				}
-+				catch (TypeException e)
-+				{
-+					e.printStackTrace();
-+					M_log.warn(":getAllAcceptableAttachments " + e.getMessage());
-+				}
-+			}
-+
-+			return resources;
-+		}
- 		
- 		/**
- 		 * Take all values from this object.
 Index: assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java
 ===================================================================
---- assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java	(revision 313717)
+--- assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java	(revision 313719)
 +++ assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/AssignmentAction.java	(working copy)
 @@ -20,6 +20,7 @@
  
@@ -1409,148 +1117,214 @@ Index: assignment-tool/tool/src/java/org/sakaiproject/assignment/tool/Assignment
  						}
  						catch(Exception ee)
  						{
-Index: assignment-tool/tool/src/webapp/css/assignment.css
+Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/css/assignment.css	(revision 313717)
-+++ assignment-tool/tool/src/webapp/css/assignment.css	(working copy)
-@@ -45,3 +45,93 @@
- .highLightBlock{
-     background:#eee;
- }
-+
-+.reportIcon
-+{
-+	display:inline-block;
-+	width:20px;
-+}
-+
-+.disclosureTriangle
-+{
-+	vertical-align:top;
-+}
-+
-+.assignmentUnsubmittable
-+{
-+	background-color: #900;
-+	color: #fff;
-+}
-+
-+.assignmentUnsubmittableAttachments
-+{
-+	background-color: #fdd;
-+}
-+
-+.assignmentUnsubmittable, .assignmentUnsubmittableAttachments
-+{
-+	border: 1px solid #900;
-+	padding: 0 10px 10px;
-+	margin: 1em 0;
-+}
-+
-+.assignmentUnsubmittable h3
-+{
-+	color: #fff;
-+}
-+
-+.assignmentUnsubmittable .assignmentInline
-+{
-+	background-color: #fff;
-+	border: 1px solid #eee;
-+	color: #000;
-+	margin-top: 10px;
-+	max-height: 300px;
-+	overflow-y: auto;
-+	padding: 0 10px;
-+}
-+
-+.assignmentWarning
-+{
-+	background: url('/library/skin/images/error.png') no-repeat left;
-+	padding-left: 2em;
-+}
-+
-+.assignmentAttachRadio
-+{
-+	margin: 2px;
-+	height: 2.5em;
-+}
-+
-+.assignmentAttachRadio input, .assignmentAttachRadio img
-+{
-+	vertical-align: bottom;
-+}
-+
-+.assignmentAttachRadio input[type=file]
-+{
-+	position: relative;
-+	top: 3px;
-+}
-+
-+.assignmentAttachmentHighlight
-+{
-+	background-color: #ffe;
-+}
-+
-+.assignmentAttachBox
-+{
-+	background-color: #eee;
-+	padding: 10px;
-+}
-+
-+.assignmentAttachBox h3
-+{
-+	margin: 0;
-+}
-+
-+.assignmentRosette
-+{
-+	vertical-align: middle;
-+}
-+
-Index: assignment-tool/tool/src/webapp/js/assignments.js
-===================================================================
---- assignment-tool/tool/src/webapp/js/assignments.js	(revision 313717)
-+++ assignment-tool/tool/src/webapp/js/assignments.js	(working copy)
-@@ -280,3 +280,36 @@
-     })
-     
- }
-+
-+function highlightSelectedAttachment()
-+{
-+	endsWith = function(str, suffix)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(revision 313719)
++++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(working copy)
+@@ -54,7 +54,23 @@
+ 					}
+    	}
+ 
+-
++	function handleReportsTriangleDisclosure(header, content)
 +	{
-+		return str.indexOf(suffix, str.length - suffix.length) !== -1;
-+	}
-+
-+	var classSuffix = " assignmentAttachmentHighlight";
-+	var radioButtons = document.getElementsByName("attachmentSelection");
-+	for (i = 0; i < radioButtons.length; i++)
-+	{
-+		var parentDiv = radioButtons[i].parentNode;
-+		if (radioButtons[i].checked)
++		var headerSrc = header.src;
++		var expand = "#imageLink("sakai/expand.gif")";
++		var collapse = "#imageLink("sakai/collapse.gif")";
++		if (headerSrc.indexOf(expand, headerSrc.length - expand.length) !== -1)
 +		{
-+			if (!endsWith(parentDiv.className, classSuffix))
-+			{
-+				//add the highlight css class
-+				parentDiv.className+=classSuffix;
-+			}
++			header.src = collapse;
++			content.removeAttribute("style");
++			resizeFrame();
 +		}
-+		else
++		else if (headerSrc.indexOf(collapse, headerSrc.length - collapse.length) !== -1)
 +		{
-+			if (endsWith(parentDiv.className, classSuffix))
-+			{
-+				//remove the highlight css class
-+				var cn = parentDiv.className;
-+				parentDiv.className=cn.substring(0, cn.length - classSuffix.length);
-+			}
++			header.src = expand;
++			content.style.display = "none";
 +		}
 +	}
-+}
+ </script>
+ 
+ <div class="portletBody">
+@@ -505,7 +521,7 @@
+ 					#if ($allowReviewService && $assignment.getContent().AllowReviewService)
+ 						<th id="reviewService">
+ 							<a href="#" onclick="location='#toolLinkParam("AssignmentAction" "doSort_grade_submission" "criteria=$!sort_submitReview")'; return false;" onkeypress="location='#toolLinkParam("AssignmentAction" "doSort_grade_submission" "criteria=$!sort_submitReview")'; return false;" title="$tlang.getString("gen.sorbyreview")">
+-								$tlang.getString("gen.rev")
++								$reviewServiceName
+ 								#if ($sortedBy.equals($!sort_submitReview)) 
+ 									#if ($sortedAsc.equals("true")) 
+ 										<img id="sort_ascending_review" src = "#imageLink("sakai/sortascending.gif")" border="0" alt="$tlang.getString("gen.sorasc")" /> 
+@@ -626,16 +642,38 @@
+ 							#end	
+ 							#if ($allowReviewService && $assignment.getContent().AllowReviewService)
+ 								<td headers="reviewService">
+-								 #if ($submission.getReviewScore() == -1)
+-                                     <div class="alertMessage" >$!submission.getReviewError()</div>
+-                                 #elseif ($submission.getReviewScore() == -2)
+-                                     $tlang.getString("review.noreport")  
+-								 #else
+-								 <a href="$submission.getReviewReport()" target="_blank" title="View report: score $submission.getReviewScore()">
+-								 <img src="$submission.getReviewIconUrl()" alt="$submission.getReviewScore()">
+-								 </a>
+-								 #end
+-									
 +
++									#set($reviewResults = $submission.ContentReviewResults)
++									#if ($reviewResults.size() >= 3)
++										<div>
++											<input class="disclosureTriangle" type="image" onclick="handleReportsTriangleDisclosure(this, this.parentNode.parentNode.children[1]); return false;" src="#imageLink("sakai/expand.gif")" alt="$tlang.getString('review.report.expand')"/>
++											## TODO: reconsider for i18n:
++											$reviewResults.size() $tlang.getString("review.reports")
++										</div>
++										<div id="reportsDiv" style="display:none;">
++									#end
++									#foreach($reviewResult in $reviewResults)
++										<div>
++											#set ($props = $reviewResult.getContentResource().Properties)
++											<span class="reportIcon">
++											#if ($reviewResult.getReviewReport().equals("Error"))
++												<img src="/library/skin/images/error.png" alt="$reviewResult.getReviewError()" title="$reviewResult.getReviewError()">
++											#else
++												<a href="$reviewResult.getReviewReport()" target="_blank">
++													<img src="$reviewResult.getReviewIconURL()" alt="$reviewResult.getReviewScore()" title="$reviewResult.getReviewScore()">
++												</a>
++											#end
++											</span>
++											#if ($reviewResult.isInline())
++												$tlang.getString("submission.inline")
++											#else
++												$validator.escapeHtml($props.getPropertyFormatted($props.NamePropDisplayName))
++											#end
++										</div>
++									#end
++									#if ($reviewResults.size() >= 3)
++										</div>
++									#end
+ 								</td>
+ 							#end
+ 							<td headers="gradereleased">
+Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm
+===================================================================
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(revision 313719)
++++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(working copy)
+@@ -356,7 +356,7 @@
+ 			<label for="subType">
+ 				$tlang.getString("gen.stusub")
+ 			</label>
+-			<select name="$name_SubmissionType" id="subType" onchange="if(document.getElementById('subType').value != 4){document.getElementById('tempAllowRes').style.display = 'block';resizeFrame();}else{document.getElementById('tempAllowRes').style.display = 'none';document.getElementById('allowResToggle').checked=false;document.getElementById('allowResubmitNumber').style.display = 'none';document.getElementById('allowResubmitTime').style.display = 'none';}" /> >
++			<select name="$name_SubmissionType" id="subType" onchange="var useReview = document.getElementById('$name_UseReviewService'); var lblUseReview = document.getElementById('lblReviewService'); var reviewSwitchNe1 = document.getElementById('review.switch.ne.1'); var reviewSwitchNe2 = document.getElementById('review.switch.ne.2'); if (document.getElementById('subType').value != 4) { reviewSwitchNe1.style.display='none'; lblReviewService.className=''; reviewSwitchNe2.style.display='none'; useReview.disabled=false; document.getElemenbById('tempAllowRes').style.display = 'block'; resizeFrame(); } else{ if (useReview.checked) { reviewSwitchNe2.style.removeProperty('display'); toggleReviewServiceOptions(this.checked); } useReview.checked=false; useReview.disabled=true; lblUseReview.className='instruction'; reviewSwitchNe1.style.removeProperty('display'); document.getElementById('tempAllowRes').style.display = 'none'; document.getElementById('allowResToggle').checked=false; document.getElementById('allowResubmitNumber').style.display = 'none'; document.getElementById('allowResubmitTime').style.display = 'none'; }" /> >
+ 				#foreach ($i in [1..$!value_totalSubmissionTypes])
+ 					#if ($i == $value_SubmissionType)
+ 						<option value="$i" selected="selected">$submissionTypeTable.get($i)</option>
+@@ -365,6 +365,7 @@
+ 					#end
+ 				#end
+ 			</select>
++			<div id="review.switch.ne.2" class="information" style="display:none;">$reviewSwitchNe2</div>
+ 		</p>
+ 		##show it only for those assignments not of type non-electronic submission
+ 		#if($!value_allowResubmitNumber && $value_SubmissionType != 4)
+@@ -497,26 +498,54 @@
+ 		#if ($allowReviewService)
+ 			<div style="display:block">
+ 				<h4>
+-				$reviewServiceName
++				$reviewServiceTitle
+ 				</h4>
+-				<div class="checkbox  indnt2">
+-					#if ($!value_UseReviewService.equals("true"))
+-						<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" checked="checked" onclick="toggleReviewServiceOptions(this.checked)"/>
+-					#else
+-						<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true"  onclick="toggleReviewServiceOptions(this.checked)"/>
+-					#end
+-					<label for="$name_UseReviewService">
+-						$reviewServiceUse
+-					</label>
+-				</div>
++				#if (4 == $value_SubmissionType)
++					<div id="review.switch.ne.1" class="information">$reviewSwitchNe1</div>
++					<div class="checkbox  indnt2">
++						#if ($!value_UseReviewService.equals("true"))
++							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" checked="checked" onclick="toggleReviewServiceOptions(this.checked)" disabled/>
++						#else
++							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true"  onclick="toggleReviewServiceOptions(this.checked)" disabled/>
++						#end
++
++						<label id="lblReviewService" for="$name_UseReviewService" class="instruction">
++							$reviewServiceUse
++						</label>
++					</div>
++				#else
++					<div id="review.switch.ne.1" class="information" style="display:none;">$reviewSwitchNe1</div>
++					<div class="checkbox indnt2">
++						#if($!value_UseReviewService.equals("true"))
++							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" checked="checked" onclick="toggleReviewServiceOptions(this.checked)"/>
++						#else
++							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" onclick="toggleReviewServiceOptions(this.checked)"/>
++						#end
++
++						<label id="lblReviewService" for="$name_UseReviewService">
++							$reviewServiceUse
++						</label>
++					</div>
++				#end
++
+ 				#if ($!value_UseReviewService.equals("true"))
+ 					<div id="reviewServiceOptions" class="indnt3">
+ 				#else
+ 					<div id="reviewServiceOptions" style="display:none" class="indnt3">
+-				#end
+-				
++				#end				
++					<div class="checkbox">
++						#if ($!value_AllowStudentView.equals("true"))
++							<input id="$name_AllowStudentView" name="$name_AllowStudentView" type="checkbox" value="true" checked="checked" />
++						#else
++							<input id="$name_AllowStudentView" name="$name_AllowStudentView" type="checkbox" value="true" />
++						#end
++						<label for="$name_AllowStudentView">
++							$tlang.getString("review.allow") 
++						</label>
++					</div>
++					<!-- Start TII custom options -->
++					#if($reviewServiceName.equals("Turnitin"))
+ 					$tlang.getString("content_review.note")
+-					
+ 					$tlang.getString("review.submit.papers.repository")
+ 					<br/>
+ 					<div class="indnt1">
+@@ -542,17 +571,6 @@
+ 						#end
+ 					</div>
+ 					<br/>
+-					<div class="checkbox">
+-						#if ($!value_AllowStudentView.equals("true"))
+-							<input id="$name_AllowStudentView" name="$name_AllowStudentView" type="checkbox" value="true" checked="checked" />
+-						#else
+-							<input id="$name_AllowStudentView" name="$name_AllowStudentView" type="checkbox" value="true" />
+-						#end
+-						<label for="$name_AllowStudentView">
+-							$tlang.getString("review.allow") 
+-						</label>
+-					</div>
+-					<br/>
+ 					$tlang.getString("review.originality.check")
+ 					<br/>
+ 					<div class="indnt1">
+@@ -605,7 +623,8 @@
+ 						</div>
+ 						#end
+ 					</div>
+-				</div>
++				<!-- End TII custom options -->
++				#end
+ 			</div>
+ 		#end
+ 		#if ($!withGrade && $!withGradebook)
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm	(revision 313717)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm	(revision 313719)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_grading_submission.vm	(working copy)
 @@ -21,6 +21,26 @@
          setupToggleAreas('toggleAnchor', 'toggledContent', false, 'fast');
@@ -1740,214 +1514,9 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor
  				#*					<!-- Grade types
  						GRADE_TYPE_NOT_SET: -1; 
  						UNGRADED_GRADE_TYPE: 1; 
-Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm
-===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(revision 313717)
-+++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_list_submissions.vm	(working copy)
-@@ -54,7 +54,23 @@
- 					}
-    	}
- 
--
-+	function handleReportsTriangleDisclosure(header, content)
-+	{
-+		var headerSrc = header.src;
-+		var expand = "#imageLink("sakai/expand.gif")";
-+		var collapse = "#imageLink("sakai/collapse.gif")";
-+		if (headerSrc.indexOf(expand, headerSrc.length - expand.length) !== -1)
-+		{
-+			header.src = collapse;
-+			content.removeAttribute("style");
-+			resizeFrame();
-+		}
-+		else if (headerSrc.indexOf(collapse, headerSrc.length - collapse.length) !== -1)
-+		{
-+			header.src = expand;
-+			content.style.display = "none";
-+		}
-+	}
- </script>
- 
- <div class="portletBody">
-@@ -505,7 +521,7 @@
- 					#if ($allowReviewService && $assignment.getContent().AllowReviewService)
- 						<th id="reviewService">
- 							<a href="#" onclick="location='#toolLinkParam("AssignmentAction" "doSort_grade_submission" "criteria=$!sort_submitReview")'; return false;" onkeypress="location='#toolLinkParam("AssignmentAction" "doSort_grade_submission" "criteria=$!sort_submitReview")'; return false;" title="$tlang.getString("gen.sorbyreview")">
--								$tlang.getString("gen.rev")
-+								$reviewServiceName
- 								#if ($sortedBy.equals($!sort_submitReview)) 
- 									#if ($sortedAsc.equals("true")) 
- 										<img id="sort_ascending_review" src = "#imageLink("sakai/sortascending.gif")" border="0" alt="$tlang.getString("gen.sorasc")" /> 
-@@ -626,16 +642,38 @@
- 							#end	
- 							#if ($allowReviewService && $assignment.getContent().AllowReviewService)
- 								<td headers="reviewService">
--								 #if ($submission.getReviewScore() == -1)
--                                     <div class="alertMessage" >$!submission.getReviewError()</div>
--                                 #elseif ($submission.getReviewScore() == -2)
--                                     $tlang.getString("review.noreport")  
--								 #else
--								 <a href="$submission.getReviewReport()" target="_blank" title="View report: score $submission.getReviewScore()">
--								 <img src="$submission.getReviewIconUrl()" alt="$submission.getReviewScore()">
--								 </a>
--								 #end
--									
-+
-+									#set($reviewResults = $submission.ContentReviewResults)
-+									#if ($reviewResults.size() >= 3)
-+										<div>
-+											<input class="disclosureTriangle" type="image" onclick="handleReportsTriangleDisclosure(this, this.parentNode.parentNode.children[1]); return false;" src="#imageLink("sakai/expand.gif")" alt="$tlang.getString('review.report.expand')"/>
-+											## TODO: reconsider for i18n:
-+											$reviewResults.size() $tlang.getString("review.reports")
-+										</div>
-+										<div id="reportsDiv" style="display:none;">
-+									#end
-+									#foreach($reviewResult in $reviewResults)
-+										<div>
-+											#set ($props = $reviewResult.getContentResource().Properties)
-+											<span class="reportIcon">
-+											#if ($reviewResult.getReviewReport().equals("Error"))
-+												<img src="/library/skin/images/error.png" alt="$reviewResult.getReviewError()" title="$reviewResult.getReviewError()">
-+											#else
-+												<a href="$reviewResult.getReviewReport()" target="_blank">
-+													<img src="$reviewResult.getReviewIconURL()" alt="$reviewResult.getReviewScore()" title="$reviewResult.getReviewScore()">
-+												</a>
-+											#end
-+											</span>
-+											#if ($reviewResult.isInline())
-+												$tlang.getString("submission.inline")
-+											#else
-+												$validator.escapeHtml($props.getPropertyFormatted($props.NamePropDisplayName))
-+											#end
-+										</div>
-+									#end
-+									#if ($reviewResults.size() >= 3)
-+										</div>
-+									#end
- 								</td>
- 							#end
- 							<td headers="gradereleased">
-Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm
-===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(revision 313717)
-+++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_instructor_new_edit_assignment.vm	(working copy)
-@@ -356,7 +356,7 @@
- 			<label for="subType">
- 				$tlang.getString("gen.stusub")
- 			</label>
--			<select name="$name_SubmissionType" id="subType" onchange="if(document.getElementById('subType').value != 4){document.getElementById('tempAllowRes').style.display = 'block';resizeFrame();}else{document.getElementById('tempAllowRes').style.display = 'none';document.getElementById('allowResToggle').checked=false;document.getElementById('allowResubmitNumber').style.display = 'none';document.getElementById('allowResubmitTime').style.display = 'none';}" /> >
-+			<select name="$name_SubmissionType" id="subType" onchange="var useReview = document.getElementById('$name_UseReviewService'); var lblUseReview = document.getElementById('lblReviewService'); var reviewSwitchNe1 = document.getElementById('review.switch.ne.1'); var reviewSwitchNe2 = document.getElementById('review.switch.ne.2'); if (document.getElementById('subType').value != 4) { reviewSwitchNe1.style.display='none'; lblReviewService.className=''; reviewSwitchNe2.style.display='none'; useReview.disabled=false; document.getElemenbById('tempAllowRes').style.display = 'block'; resizeFrame(); } else{ if (useReview.checked) { reviewSwitchNe2.style.removeProperty('display'); toggleReviewServiceOptions(this.checked); } useReview.checked=false; useReview.disabled=true; lblUseReview.className='instruction'; reviewSwitchNe1.style.removeProperty('display'); document.getElementById('tempAllowRes').style.display = 'none'; document.getElementById('allowResToggle').checked=false; document.getElementById('allowResubmitNumber').style.display = 'none'; document.getElementById('allowResubmitTime').style.display = 'none'; }" /> >
- 				#foreach ($i in [1..$!value_totalSubmissionTypes])
- 					#if ($i == $value_SubmissionType)
- 						<option value="$i" selected="selected">$submissionTypeTable.get($i)</option>
-@@ -365,6 +365,7 @@
- 					#end
- 				#end
- 			</select>
-+			<div id="review.switch.ne.2" class="information" style="display:none;">$reviewSwitchNe2</div>
- 		</p>
- 		##show it only for those assignments not of type non-electronic submission
- 		#if($!value_allowResubmitNumber && $value_SubmissionType != 4)
-@@ -497,26 +498,54 @@
- 		#if ($allowReviewService)
- 			<div style="display:block">
- 				<h4>
--				$reviewServiceName
-+				$reviewServiceTitle
- 				</h4>
--				<div class="checkbox  indnt2">
--					#if ($!value_UseReviewService.equals("true"))
--						<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" checked="checked" onclick="toggleReviewServiceOptions(this.checked)"/>
--					#else
--						<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true"  onclick="toggleReviewServiceOptions(this.checked)"/>
--					#end
--					<label for="$name_UseReviewService">
--						$reviewServiceUse
--					</label>
--				</div>
-+				#if (4 == $value_SubmissionType)
-+					<div id="review.switch.ne.1" class="information">$reviewSwitchNe1</div>
-+					<div class="checkbox  indnt2">
-+						#if ($!value_UseReviewService.equals("true"))
-+							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" checked="checked" onclick="toggleReviewServiceOptions(this.checked)" disabled/>
-+						#else
-+							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true"  onclick="toggleReviewServiceOptions(this.checked)" disabled/>
-+						#end
-+
-+						<label id="lblReviewService" for="$name_UseReviewService" class="instruction">
-+							$reviewServiceUse
-+						</label>
-+					</div>
-+				#else
-+					<div id="review.switch.ne.1" class="information" style="display:none;">$reviewSwitchNe1</div>
-+					<div class="checkbox indnt2">
-+						#if($!value_UseReviewService.equals("true"))
-+							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" checked="checked" onclick="toggleReviewServiceOptions(this.checked)"/>
-+						#else
-+							<input id="$name_UseReviewService" name="$name_UseReviewService" type="checkbox" value="true" onclick="toggleReviewServiceOptions(this.checked)"/>
-+						#end
-+
-+						<label id="lblReviewService" for="$name_UseReviewService">
-+							$reviewServiceUse
-+						</label>
-+					</div>
-+				#end
-+
- 				#if ($!value_UseReviewService.equals("true"))
- 					<div id="reviewServiceOptions" class="indnt3">
- 				#else
- 					<div id="reviewServiceOptions" style="display:none" class="indnt3">
--				#end
--				
-+				#end				
-+					<div class="checkbox">
-+						#if ($!value_AllowStudentView.equals("true"))
-+							<input id="$name_AllowStudentView" name="$name_AllowStudentView" type="checkbox" value="true" checked="checked" />
-+						#else
-+							<input id="$name_AllowStudentView" name="$name_AllowStudentView" type="checkbox" value="true" />
-+						#end
-+						<label for="$name_AllowStudentView">
-+							$tlang.getString("review.allow") 
-+						</label>
-+					</div>
-+					<!-- Start TII custom options -->
-+					#if($reviewServiceName.equals("Turnitin"))
- 					$tlang.getString("content_review.note")
--					
- 					$tlang.getString("review.submit.papers.repository")
- 					<br/>
- 					<div class="indnt1">
-@@ -542,17 +571,6 @@
- 						#end
- 					</div>
- 					<br/>
--					<div class="checkbox">
--						#if ($!value_AllowStudentView.equals("true"))
--							<input id="$name_AllowStudentView" name="$name_AllowStudentView" type="checkbox" value="true" checked="checked" />
--						#else
--							<input id="$name_AllowStudentView" name="$name_AllowStudentView" type="checkbox" value="true" />
--						#end
--						<label for="$name_AllowStudentView">
--							$tlang.getString("review.allow") 
--						</label>
--					</div>
--					<br/>
- 					$tlang.getString("review.originality.check")
- 					<br/>
- 					<div class="indnt1">
-@@ -605,7 +623,8 @@
- 						</div>
- 						#end
- 					</div>
--				</div>
-+				<!-- End TII custom options -->
-+				#end
- 			</div>
- 		#end
- 		#if ($!withGrade && $!withGradebook)
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm	(revision 313717)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm	(revision 313719)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_grade.vm	(working copy)
 @@ -9,6 +9,26 @@
      $(document).ready(function(){
@@ -2038,7 +1607,7 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_vi
  			#foreach ($attachment in $submittedAttachments) 
 Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm
 ===================================================================
---- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm	(revision 313717)
+--- assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm	(revision 313719)
 +++ assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_view_submission.vm	(working copy)
 @@ -47,7 +47,6 @@
  		theForm.submit();
@@ -2109,3 +1678,585 @@ Index: assignment-tool/tool/src/webapp/vm/assignment/chef_assignments_student_vi
  							</p>
  							<table border="0">
  								<tr>
+Index: assignment-tool/tool/src/webapp/css/assignment.css
+===================================================================
+--- assignment-tool/tool/src/webapp/css/assignment.css	(revision 313719)
++++ assignment-tool/tool/src/webapp/css/assignment.css	(working copy)
+@@ -45,3 +45,93 @@
+ .highLightBlock{
+     background:#eee;
+ }
++
++.reportIcon
++{
++	display:inline-block;
++	width:20px;
++}
++
++.disclosureTriangle
++{
++	vertical-align:top;
++}
++
++.assignmentUnsubmittable
++{
++	background-color: #900;
++	color: #fff;
++}
++
++.assignmentUnsubmittableAttachments
++{
++	background-color: #fdd;
++}
++
++.assignmentUnsubmittable, .assignmentUnsubmittableAttachments
++{
++	border: 1px solid #900;
++	padding: 0 10px 10px;
++	margin: 1em 0;
++}
++
++.assignmentUnsubmittable h3
++{
++	color: #fff;
++}
++
++.assignmentUnsubmittable .assignmentInline
++{
++	background-color: #fff;
++	border: 1px solid #eee;
++	color: #000;
++	margin-top: 10px;
++	max-height: 300px;
++	overflow-y: auto;
++	padding: 0 10px;
++}
++
++.assignmentWarning
++{
++	background: url('/library/skin/images/error.png') no-repeat left;
++	padding-left: 2em;
++}
++
++.assignmentAttachRadio
++{
++	margin: 2px;
++	height: 2.5em;
++}
++
++.assignmentAttachRadio input, .assignmentAttachRadio img
++{
++	vertical-align: bottom;
++}
++
++.assignmentAttachRadio input[type=file]
++{
++	position: relative;
++	top: 3px;
++}
++
++.assignmentAttachmentHighlight
++{
++	background-color: #ffe;
++}
++
++.assignmentAttachBox
++{
++	background-color: #eee;
++	padding: 10px;
++}
++
++.assignmentAttachBox h3
++{
++	margin: 0;
++}
++
++.assignmentRosette
++{
++	vertical-align: middle;
++}
++
+Index: assignment-tool/tool/src/webapp/js/assignments.js
+===================================================================
+--- assignment-tool/tool/src/webapp/js/assignments.js	(revision 313719)
++++ assignment-tool/tool/src/webapp/js/assignments.js	(working copy)
+@@ -280,3 +280,36 @@
+     })
+     
+ }
++
++function highlightSelectedAttachment()
++{
++	endsWith = function(str, suffix)
++	{
++		return str.indexOf(suffix, str.length - suffix.length) !== -1;
++	}
++
++	var classSuffix = " assignmentAttachmentHighlight";
++	var radioButtons = document.getElementsByName("attachmentSelection");
++	for (i = 0; i < radioButtons.length; i++)
++	{
++		var parentDiv = radioButtons[i].parentNode;
++		if (radioButtons[i].checked)
++		{
++			if (!endsWith(parentDiv.className, classSuffix))
++			{
++				//add the highlight css class
++				parentDiv.className+=classSuffix;
++			}
++		}
++		else
++		{
++			if (endsWith(parentDiv.className, classSuffix))
++			{
++				//remove the highlight css class
++				var cn = parentDiv.className;
++				parentDiv.className=cn.substring(0, cn.length - classSuffix.length);
++			}
++		}
++	}
++}
++
+Index: assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java
+===================================================================
+--- assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java	(revision 313719)
++++ assignment-impl/impl/src/java/org/sakaiproject/assignment/impl/BaseAssignmentService.java	(working copy)
+@@ -70,6 +70,7 @@
+ import org.sakaiproject.assignment.api.AssignmentService;
+ import org.sakaiproject.assignment.api.AssignmentSubmission;
+ import org.sakaiproject.assignment.api.AssignmentSubmissionEdit;
++import org.sakaiproject.assignment.api.ContentReviewResult;
+ import org.sakaiproject.assignment.taggable.api.AssignmentActivityProducer;
+ import org.sakaiproject.authz.api.AuthzGroup;
+ import org.sakaiproject.authz.api.AuthzPermissionException;
+@@ -6544,6 +6545,12 @@
+ 	 */
+ 	public boolean canSubmit(String context, Assignment a)
+ 	{
++		// submissions are never allowed to non-electronic assignments	--bbailla2
++		if (a.getContent().getTypeOfSubmission() == Assignment.NON_ELECTRONIC_ASSIGNMENT_SUBMISSION)
++		{
++			return false;
++		}
++
+ 		// return false if not allowed to submit at all
+ 		if (!allowAddSubmissionCheckGroups(context, a)) return false;
+ 		
+@@ -9314,8 +9321,8 @@
+                         M_log.debug(this + " getReviewStatus returned a status of: " + status);
+                         return -2;
+                     }
+-
+-					int score = contentReviewService.getReviewScore(contentId);
++                    String userId = (String)this.getSubmitterIds().get(0);
++					int score = contentReviewService.getReviewScore(contentId, getAssignment().getReference(), userId);
+ 					m_reviewScore = score;
+ 					M_log.debug(this + " getReviewScore CR returned a score of: " + score);
+ 					return score;
+@@ -9326,10 +9333,9 @@
+ 					try {
+ 						
+ 							M_log.debug(this + " getReviewScore Item is not in queue we will try add it");
+-							String contentId = cr.getId();
+ 							String userId = (String)this.getSubmitterIds().get(0);
+ 							try {
+-								contentReviewService.queueContent(userId, null, getAssignment().getReference(), contentId);
++								contentReviewService.queueContent(userId, this.getContext(), getAssignment().getReference(), Arrays.asList(cr));
+ 							}
+ 							catch (QueueException qe) {
+ 								M_log.warn(" getReviewScore Unable to queue content with content review Service: " + qe.getMessage());
+@@ -9352,6 +9358,76 @@
+ 	
+ 			
+ 		}
++
++		// SAK-26322	--bbailla2
++		/**
++		 * Essentially the same as getReviewScore() only it acts upon the ContentResource parameter rather than that which is returned by firstAcceptableAttachment().
++		 * TODO: consider deleting getReviewScore(). If not possible, then refactor to eliminate code duplication
++		 */
++		private int getReviewScore(ContentResource cr)
++		{
++			M_log.debug(this + " getReviewScore(ContentResource) for submission " + this.getId() + " and review service is: " + (this.getAssignment().getContent().getAllowReviewService()));
++
++			//null check, allow review service check
++			if (cr == null)
++			{
++				M_log.debug(this + " getReviewScore(ContentResource) called with cr == null");
++				return -2;
++			}
++
++			if (!this.getAssignment().getContent().getAllowReviewService())
++			{
++				M_log.debug(this + " getReviewScore(ContentResource) Content review is not enabled for this assignment");
++				return -2;
++			}
++
++			//get the status from the content review service, if it's in a valid status, get the score)
++			try
++			{
++				String contentId = cr.getId();
++				M_log.debug(this + " getReviewScore(ContentResource) checking for score for content: " + contentId);
++
++				Long status = contentReviewService.getReviewStatus(contentId);
++				if (status != null && (status.equals(ContentReviewItem.NOT_SUBMITTED_CODE) || status.equals(ContentReviewItem.SUBMITTED_AWAITING_REPORT_CODE)))
++				{
++					M_log.debug(this + " getReviewStatus returned a state of: " + status);
++					return -2;
++				}
++				String userId = (String)this.getSubmitterIds().get(0);
++				int score = contentReviewService.getReviewScore(contentId, getAssignment().getReference(), userId);
++				// TODO: delete the following line if there will be no repercussions:
++				m_reviewScore = score;
++				M_log.debug(this + " getReviewScore(ContentResource) CR returned a score of: " + score);
++				return score;
++			}
++			catch (QueueException cie)
++			{
++				//should we add the item
++				try
++				{
++					M_log.debug(" getReviewScore(ContentResource) Item is not in queue we will try to add it");
++					String userId = (String)this.getSubmitterIds().get(0);
++					try
++					{
++						contentReviewService.queueContent(userId, this.getContext(), getAssignment().getReference(), Arrays.asList(cr));
++					}
++					catch (QueueException qe)
++					{
++						M_log.warn(" getReviewScore(ContentResource) Unable to queue content with content review service: " + qe.getMessage());
++					}
++				}
++				catch (Exception e)
++				{
++					e.printStackTrace();
++				}
++				return -1;
++			}
++			catch (Exception e)
++			{
++				M_log.warn(this + " getReviewScore " + e.getMessage());
++				return -1;
++			}
++		}
+ 		
+ 		public String getReviewReport() {
+ //			 Code to get updated report if default
+@@ -9370,11 +9446,11 @@
+ 					}
+ 					
+ 					String contentId = cr.getId();
+-					
++					String userId = (String)this.getSubmitterIds().get(0);
+ 					if (allowGradeSubmission(getReference()))
+-						return contentReviewService.getReviewReportInstructor(contentId);
++						return contentReviewService.getReviewReportInstructor(contentId, getAssignment().getReference(), userId);
+ 					else
+-						return contentReviewService.getReviewReportStudent(contentId);
++						return contentReviewService.getReviewReportStudent(contentId, getAssignment().getReference(), userId);
+ 					
+ 				} catch (Exception e) {
+ 					M_log.warn(":getReviewReport() " + e.getMessage());
+@@ -9384,7 +9460,41 @@
+ 			}
+ 			
+ 		}
++
++		//SAK-26322	--bbailla2
++		/**
++		 * Essentially the same as getReviewReport(), only it acts upon the ContentResource that is passed rather than that which is returned from getFirstAcceptableAttachment()
++		 * TODO: consider removing getReviewReport(). If this is not possible, eliminate code duplication
++		 */
++		private String getReviewReport(ContentResource cr)
++		{
++			if (cr == null)
++			{
++				M_log.debug(this.getId() + " getReviewReport(ContentResource) called with cr == null");
++				return "Error";
++			}
++
++			try
++			{
++				String contentId = cr.getId();
++				String userId = (String)this.getSubmitterIds().get(0);
++				if (allowGradeSubmission(getReference()))
++				{
++					return contentReviewService.getReviewReportInstructor(contentId, getAssignment().getReference(), userId);
++				}
++				else
++				{
++					return contentReviewService.getReviewReportStudent(contentId, getAssignment().getReference(), userId);
++				}
++			}
++			catch (Exception e)
++			{
++				M_log.warn(":getReviewReport(ContentResource) " + e.getMessage());
++				return "Error";
++			}
++		}
+ 		
++		//TODO: delete this and all calling methods if there are no repercussions	--bbailla2
+ 		private ContentResource getFirstAcceptableAttachement() {
+ 			String contentId = null;
+ 			try {
+@@ -9402,6 +9512,34 @@
+ 			}
+ 			return null;
+ 		}
++
++		/**
++		 * SAK-26322
++		 * Gets all attachments in m_submittedAttachments that are acceptable to the content review service
++		 * @author bbailla2
++		 */
++		private List<ContentResource> getAllAcceptableAttachments()
++		{
++			List<ContentResource> attachments = new ArrayList<ContentResource>();
++			for (int i = 0; i< m_submittedAttachments.size(); i++)
++			{
++				try
++				{
++					Reference ref = (Reference)m_submittedAttachments.get(i);
++					ContentResource contentResource = (ContentResource)ref.getEntity();
++					if (contentReviewService.isAcceptableContent(contentResource))
++					{
++						attachments.add((ContentResource)contentResource);
++					}
++				}
++				catch (Exception e)
++				{
++					M_log.warn(":getAllAcceptableAttachments() " + e.getMessage());
++					e.printStackTrace();
++				}
++			}
++			return attachments;
++		}
+ 		
+ 		public String getReviewStatus() {
+ 			return m_reviewStatus;
+@@ -9463,13 +9601,117 @@
+             }
+         }
+ 
++		//SAK-26322	--bbailla2
++		/**
++		 * Essentially the same as getReviewError(), only it acts upon the ContentResource that is passed rather than that which is returned from getFirstAcceptableAttachment()
++		 */
++		private String getReviewError(ContentResource cr)
++		{
++			if (cr == null)
++			{
++				M_log.debug(this.getId() + " getReviewReport(ContentResource) called with cr == null");
++				return null;
++			}
++			try
++			{
++				String contentId = cr.getId();
++				//This should use getLocalizedReviewErrorMesage(contentId)
++				//to get a i18n message of the error
++				Long status = contentReviewService.getReviewStatus(contentId);
++				String errorMessage = null;
+ 
++				// TODO: we can remove this null check if we use yoda statements below	--bbailla2
++				if (status != null)
++				{
++					if (status.equals(ContentReviewItem.REPORT_ERROR_NO_RETRY_CODE))
++					{
++						errorMessage = rb.getString("content_review.error.REPORT_ERROR_NO_RETRY_CODE");
++					}
++					else if (status.equals(ContentReviewItem.REPORT_ERROR_RETRY_CODE))
++					{
++						errorMessage = rb.getString("content_review.error.REPORT_ERROR_RETRY_CODE");
++					}
++					else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_NO_RETRY_CODE))
++					{
++						errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_NO_RETRY_CODE");
++					}
++					else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_RETRY_CODE))
++					{
++						errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_RETRY_CODE");
++					}
++					else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_RETRY_EXCEEDED))
++					{
++						errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_RETRY_EXCEEDED_CODE");
++					}
++					else if (status.equals(ContentReviewItem.SUBMISSION_ERROR_USER_DETAILS_CODE))
++					{
++						errorMessage = rb.getString("content_review.error.SUBMISSION_ERROR_USER_DETAILS_CODE");
++					}
++					else if (ContentReviewItem.SUBMITTED_AWAITING_REPORT_CODE.equals(status) || ContentReviewItem.NOT_SUBMITTED_CODE.equals(status))
++					{
++						errorMessage = rb.getString("content_review.pending.info");
++					}
++				}
++
++				if (errorMessage == null)
++				{
++					errorMessage = rb.getString("content_review.error");
++				}
++
++				return errorMessage;
++			}
++			catch (Exception e)
++			{
++				M_log.warn(this + ":getReviewError(ContentResource) " + e.getMessage());
++				return null;
++			}
++		}
++
++
+ 		public String getReviewIconUrl() {
+ 			if (m_reviewIconUrl == null )
+ 				m_reviewIconUrl = contentReviewService.getIconUrlforScore(Long.valueOf(this.getReviewScore()));
+ 				
+ 			return m_reviewIconUrl;
+ 		}
++
++		// SAK-26322	--bbailla2
++		/**
++		 * @inheritDoc
++		 */
++		@Override
++		public List<ContentReviewResult> getContentReviewResults()
++		{
++			ArrayList<ContentReviewResult> reviewResults = new ArrayList<ContentReviewResult>();
++
++			//get all the attachments for this submission and populate the reviewResults
++			List<ContentResource> contentResources = getAllAcceptableAttachments();
++			Iterator<ContentResource> itContentResources = contentResources.iterator();
++			while (itContentResources.hasNext())
++			{
++				ContentResource cr = itContentResources.next();
++				ContentReviewResult reviewResult = new ContentReviewResult();
++
++				reviewResult.setContentResource(cr);
++				int reviewScore = getReviewScore(cr);
++				reviewResult.setReviewScore(reviewScore);
++				reviewResult.setReviewReport(getReviewReport(cr));
++				//skip review status, it's unused
++				String iconUrl = contentReviewService.getIconUrlforScore(Long.valueOf(reviewScore));
++				reviewResult.setReviewIconURL(iconUrl);
++				reviewResult.setReviewError(getReviewError(cr));
++
++				if ("true".equals(cr.getProperties().getProperty(PROP_INLINE_SUBMISSION)))
++				{
++					reviewResults.add(0, reviewResult);
++				}
++				else
++				{
++					reviewResults.add(reviewResult);
++				}
++			}
++			return reviewResults;
++		}
+ 		
+ 		/**
+ 		 * constructor
+@@ -10502,7 +10744,31 @@
+ 			return m_submittedAttachments;
+ 		}
+ 
++		//SAK-26322	--bbailla2
+ 		/**
++		 * @inheritDoc
++		 */
++		@Override
++		public List getVisibleSubmittedAttachments()
++		{
++			List visibleAttachments = new ArrayList();
++			if (m_submittedAttachments != null)
++			{
++				Iterator itAttachments = m_submittedAttachments.iterator();
++				while (itAttachments.hasNext())
++				{
++					Reference attachment = (Reference) itAttachments.next();
++					ResourceProperties props = attachment.getProperties();
++					if (!"true".equals(props.getProperty(PROP_INLINE_SUBMISSION)))
++					{
++						visibleAttachments.add(attachment);
++					}
++				}
++			}
++			return visibleAttachments;
++		}
++
++		/**
+ 		 * Get the general comments by the grader
+ 		 * 
+ 		 * @return The text of the grader's comments; may be null.
+@@ -11171,23 +11437,28 @@
+ 			//Send the attachment to the review service
+ 
+ 			try {
+-				ContentResource cr = getFirstAcceptableAttachement(attachments);
+-				Assignment ass = this.getAssignment();
++				//SAK-26322	--bbailla2
++				List<ContentResource> resources = getAllAcceptableAttachments(attachments);
++				Assignment ass = this.getAssignment();			
+ 				if (ass != null)
+ 				{
+-					contentReviewService.queueContent(null, null, ass.getReference(), cr.getId());
++					String userId = (String)this.getSubmitterIds().get(0);
++					contentReviewService.queueContent(userId, this.getContext(), ass.getReference(), resources);
+ 				}
+ 				else
+ 				{
+ 					// error, assignment couldn't be found. Log the error
+ 					M_log.debug(this + " BaseAssignmentSubmissionEdit postAttachment: Unable to find assignment associated with submission id= " + this.m_id + " and assignment id=" + this.m_assignment);
+ 				}
+-			} catch (QueueException qe) {
++			}
++			catch (QueueException qe)
++			{
+ 				M_log.warn(" BaseAssignmentSubmissionEdit postAttachment: Unable to add content to Content Review queue: " + qe.getMessage());
+-			} catch (Exception e) {
++			}
++			catch (Exception e)
++			{
+ 				e.printStackTrace();
+ 			}
+-
+ 		}
+ 
+ 		private ContentResource getFirstAcceptableAttachement(List attachments) {
+@@ -11217,6 +11488,40 @@
+ 			}
+ 			return null;
+ 		}
++
++		private List<ContentResource> getAllAcceptableAttachments(List attachments)
++		{
++			List<ContentResource> resources = new ArrayList<ContentResource>();
++			for (int i = 0; i < attachments.size(); i++)
++			{
++				Reference attachment = (Reference) attachments.get(i);
++				try
++				{
++					ContentResource res = m_contentHostingService.getResource(attachment.getId());
++					if (contentReviewService.isAcceptableContent(res))
++					{
++						resources.add(res);
++					}
++				}
++				catch (PermissionException e)
++				{
++					e.printStackTrace();
++					M_log.warn(":getAllAcceptableAttachments " + e.getMessage());
++				}
++				catch (IdUnusedException e)
++				{
++					e.printStackTrace();
++					M_log.warn(":getAllAcceptableAttachments " + e.getMessage());
++				}
++				catch (TypeException e)
++				{
++					e.printStackTrace();
++					M_log.warn(":getAllAcceptableAttachments " + e.getMessage());
++				}
++			}
++
++			return resources;
++		}
+ 		
+ 		/**
+ 		 * Take all values from this object.

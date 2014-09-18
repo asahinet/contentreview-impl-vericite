@@ -1,303 +1,334 @@
-Index: ddl/pom.xml
-===================================================================
---- ddl/pom.xml	(revision 86574)
-+++ ddl/pom.xml	(working copy)
-@@ -10,7 +10,7 @@
- 
-     <!-- this should refer to your project base POM (remove if not needed) -->
-     <parent>
--        <artifactId>content-review-impl-base</artifactId>
-+        <artifactId>content-review-impl-base-tii</artifactId>
-         <groupId>org.sakaiproject.contentreview</groupId>
-         <version>0.1-SNAPSHOT</version>
-         <relativePath>../pom.xml</relativePath>
-@@ -50,7 +50,7 @@
- 
-         <dependency>
-             <groupId>org.sakaiproject.contentreview</groupId>
--            <artifactId>sakai-contentreview-impl</artifactId>
-+            <artifactId>sakai-contentreview-impl-tii</artifactId>
-         </dependency>
- 
-     </dependencies>
-Index: hbm/pom.xml
-===================================================================
---- hbm/pom.xml	(revision 86574)
-+++ hbm/pom.xml	(working copy)
-@@ -17,7 +17,7 @@
-     </properties>
- 
-     <parent>
--        <artifactId>content-review-impl-base</artifactId>
-+        <artifactId>content-review-impl-base-tii</artifactId>
-         <groupId>org.sakaiproject.contentreview</groupId>
-         <version>0.9-SNAPSHOT</version>
-         <relativePath>../pom.xml</relativePath>
 Index: impl/pom.xml
 ===================================================================
---- impl/pom.xml	(revision 86574)
+--- impl/pom.xml	(revision 87007)
 +++ impl/pom.xml	(working copy)
-@@ -3,7 +3,7 @@
-     <modelVersion>4.0.0</modelVersion>
-     <name>Turnitin ContentReview IMPL</name>
-     <groupId>org.sakaiproject.contentreview</groupId>
--    <artifactId>sakai-contentreview-impl</artifactId>
-+    <artifactId>sakai-contentreview-impl-tii</artifactId>
-     <organization>
-         <name>Sakai Project</name>
-         <url>http://www.sakaiproject.org/</url>
-@@ -13,7 +13,7 @@
-     <packaging>jar</packaging>
- 
-     <parent>
--        <artifactId>content-review-impl-base</artifactId>
-+        <artifactId>content-review-impl-base-tii</artifactId>
-         <groupId>org.sakaiproject.contentreview</groupId>
-         <version>0.9-SNAPSHOT</version>
-         <relativePath>../pom.xml</relativePath>
-Index: impl/src/java/org/sakaiproject/contentreview/impl/hbm/BaseReviewServiceImpl.java
-===================================================================
---- impl/src/java/org/sakaiproject/contentreview/impl/hbm/BaseReviewServiceImpl.java	(revision 86574)
-+++ impl/src/java/org/sakaiproject/contentreview/impl/hbm/BaseReviewServiceImpl.java	(working copy)
-@@ -70,10 +70,14 @@
- 		this.siteAdvisor = crsa;
- 	}
- 	
--	public void queueContent(String userId, String siteId, String taskId, String contentId)
-+	public void queueContent(String userId, String siteId, String taskId, List<String> contentIds, String inlineText, long submissionTime)
- 			throws QueueException {
-+		if(contentIds == null || contentIds.size() < 1){
-+			return;
-+		}
-+		String contentId = contentIds.get(0);
-+
- 		log.debug("Method called queueContent(" + userId + "," + siteId + "," + contentId + ")");
--
- 		if (userId == null) {
- 			log.debug("Using current user");
- 			userId = userDirectoryService.getCurrentUser().getId();
-Index: impl/src/java/org/sakaiproject/contentreview/impl/turnitin/TurnitinReviewServiceImpl.java
-===================================================================
---- impl/src/java/org/sakaiproject/contentreview/impl/turnitin/TurnitinReviewServiceImpl.java	(revision 86574)
-+++ impl/src/java/org/sakaiproject/contentreview/impl/turnitin/TurnitinReviewServiceImpl.java	(working copy)
-@@ -214,7 +214,7 @@
- 
- 	public String getIconUrlforScore(Long score) {
- 
--		String urlBase = "/sakai-contentreview-tool/images/score_";
-+		String urlBase = "/sakai-contentreview-tool-tii/images/score_";
- 		String suffix = ".gif";
- 
- 		if (score.equals(Long.valueOf(0))) {
-@@ -239,7 +239,7 @@
- 	 *
- 	 * @see org.sakaiproject.contentreview.impl.hbm.BaseReviewServiceImpl#getReviewReportInstructor(java.lang.String)
- 	 */
--	public String getReviewReportInstructor(String contentId) throws QueueException, ReportException {
-+	public String getReviewReportInstructor(String contentId, String assignmentRef, String studentId) throws QueueException, ReportException {
- 
- 		Search search = new Search();
- 		search.addRestriction(new Restriction("contentId", contentId));
-@@ -285,7 +285,7 @@
- 		return turnitinConn.buildTurnitinURL(params);
- 	}
- 
--	public String getReviewReportStudent(String contentId) throws QueueException, ReportException {
-+	public String getReviewReportStudent(String contentId, String assignmentRef, String studentId) throws QueueException, ReportException {
- 
- 		Search search = new Search();
- 		search.addRestriction(new Restriction("contentId", contentId));
-@@ -342,13 +342,13 @@
- 		return turnitinConn.buildTurnitinURL(params);
- 	}
- 
--	public String getReviewReport(String contentId)
-+	public String getReviewReport(String contentId, String assignmentRef, String studentId)
- 	throws QueueException, ReportException {
- 
- 		// first retrieve the record from the database to get the externalId of
- 		// the content
- 		log.warn("Deprecated Methog getReviewReport(String contentId) called");
--		return this.getReviewReportInstructor(contentId);
-+		return this.getReviewReportInstructor(contentId, assignmentRef, studentId);
- 	}
- 
- private List<ContentReviewItem> getItemsByContentId(String contentId) {
-@@ -373,6 +373,19 @@
-         return assignData;
-     }
- 
-+    public String getInlineTextId(String assignmentReference, String userId, long submissionTime){
-+	return "";
-+    } 	
-+
-+    public boolean acceptInlineAndMultipleAttachments(){
-+	return false;
-+    }
-+
-+    public int getReviewScore(String contentId, String assignmentRef, String userId) throws QueueException,
-+                        ReportException, Exception {
-+	return getReviewScore(contentId);
-+    }
-+
-     @Override
-     public int getReviewScore(String contentId)throws QueueException, ReportException, Exception {
-             ContentReviewItem item=null;
-Index: pack/pom.xml
-===================================================================
---- pack/pom.xml	(revision 86574)
-+++ pack/pom.xml	(working copy)
-@@ -3,7 +3,7 @@
-     <modelVersion>4.0.0</modelVersion>
-     <name>sakai-content-review-pack</name>
-     <groupId>org.sakaiproject</groupId>
--    <artifactId>sakai-content-review-pack</artifactId>
-+    <artifactId>sakai-content-review-pack-tii</artifactId>
-     <organization>
-         <name>University of Cape Town</name>
-         <url>http://sakaiproject.org/</url>
 @@ -15,7 +15,7 @@
-     </properties>
- 
      <parent>
--        <artifactId>content-review-impl-base</artifactId>
-+        <artifactId>content-review-impl-base-tii</artifactId>
+         <artifactId>content-review-impl-base-tii</artifactId>
          <groupId>org.sakaiproject.contentreview</groupId>
-         <version>0.9-SNAPSHOT</version>
+-        <version>11-SNAPSHOT</version>
++        <version>0.9-SNAPSHOT</version>
          <relativePath>../pom.xml</relativePath>
-@@ -25,7 +25,7 @@
+     </parent>
  
+@@ -47,12 +47,12 @@
+         <!-- Spring and Hibernate dependencies. -->
          <dependency>
-             <groupId>org.sakaiproject.contentreview</groupId>
--            <artifactId>sakai-contentreview-impl</artifactId>
-+            <artifactId>sakai-contentreview-impl-tii</artifactId>
-             <scope>runtime</scope>
+             <groupId>org.springframework</groupId>
+-            <artifactId>spring-core</artifactId>
++            <artifactId>spring</artifactId>
          </dependency>
  
-Index: pack/src/webapp/WEB-INF/components.xml
+         <dependency>
+             <groupId>org.hibernate</groupId>
+-            <artifactId>hibernate-core</artifactId>
++            <artifactId>hibernate</artifactId>
+         </dependency>
+ 
+         <!-- Required for hibernate 3 HQL queries -->
+@@ -70,9 +70,12 @@
+         </dependency>
+         <!-- Quartz dependencies -->
+         <dependency>
+-            <groupId>org.quartz-scheduler</groupId>
++            <groupId>quartz</groupId>
+             <artifactId>quartz</artifactId>
++            <version>1.5.2</version>
++	    <scope>provided</scope>
+         </dependency>
++
+         <!-- Various Sakai dependencies -->
+         <dependency>
+             <groupId>org.sakaiproject.kernel</groupId>
+@@ -107,28 +110,36 @@
+ 	<dependency>
+ 		<groupId>org.apache.poi</groupId>
+ 		<artifactId>poi</artifactId>
+-		<version>3.10-FINAL</version>
++		<version>3.9</version>
+ 	</dependency>
+ 	<dependency>
+ 		<groupId>org.apache.poi</groupId>
+ 		<artifactId>poi-scratchpad</artifactId>
+-		<version>3.10-FINAL</version>
++		<version>3.9</version>
+ 	</dependency>
+ 
+         <!-- PonderUtilCore for StreamUtils -->
+         <dependency>
+             <groupId>uk.org.ponder</groupId>
+             <artifactId>ponderutilcore</artifactId>
+-            <version>1.3.0</version>
++            <version>1.2.4</version>
+         </dependency>
+ 
+         <!-- testing dependencies -->
+         <dependency>
++            <groupId>org.springframework</groupId>
++            <artifactId>spring-test</artifactId>
++            <version>2.5.6.SEC02</version>
++            <scope>test</scope>
++        </dependency>
++
++        <dependency>
+             <groupId>hsqldb</groupId>
+             <artifactId>hsqldb</artifactId>
+             <version>1.8.0.5</version>
+             <scope>test</scope>
+         </dependency>
++
+         <dependency>
+             <groupId>jta</groupId>
+             <artifactId>jta</artifactId>
+@@ -172,43 +183,6 @@
+             <groupId>org.sakaiproject.edu-services.gradebook</groupId>
+             <artifactId>gradebook-service-api</artifactId>
+         </dependency>
+-
+-      <!-- needed by hibernate unit tests -->
+-        <dependency>
+-            <groupId>org.hibernate</groupId>
+-            <artifactId>hibernate-ehcache</artifactId>
+-        </dependency>
+-        <dependency>
+-            <groupId>org.javassist</groupId>
+-            <artifactId>javassist</artifactId>
+-        </dependency>
+-        <dependency>
+-            <groupId>org.springframework</groupId>
+-            <artifactId>spring-orm</artifactId>
+-        </dependency>
+-        <dependency>
+-            <groupId>org.springframework</groupId>
+-            <artifactId>spring-tx</artifactId>
+-        </dependency>
+-        <dependency>
+-            <groupId>org.springframework</groupId>
+-            <artifactId>spring-test</artifactId>
+-            <scope>test</scope>
+-        </dependency>
+-        <dependency>
+-            <groupId>org.springframework</groupId>
+-            <artifactId>spring-context</artifactId>
+-            <scope>test</scope>
+-        </dependency>
+-        <dependency>
+-            <groupId>org.springframework</groupId>
+-            <artifactId>spring-jdbc</artifactId>
+-            <scope>test</scope>
+-        </dependency>
+-	<dependency>
+-	  <groupId>org.slf4j</groupId>
+-   	  <artifactId>slf4j-log4j12</artifactId>
+-	 </dependency>
+     </dependencies>
+ 
+     <build>
+Index: ddl/pom.xml
 ===================================================================
---- pack/src/webapp/WEB-INF/components.xml	(revision 86574)
-+++ pack/src/webapp/WEB-INF/components.xml	(working copy)
-@@ -20,7 +20,7 @@
+--- ddl/pom.xml	(revision 87007)
++++ ddl/pom.xml	(working copy)
+@@ -12,7 +12,7 @@
+     <parent>
+         <artifactId>content-review-impl-base-tii</artifactId>
+         <groupId>org.sakaiproject.contentreview</groupId>
+-        <version>11-SNAPSHOT</version>
++        <version>0.1-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
  
- 	<!-- create a logic bean, give it the dao from above and some sakai services -->
- 	<bean
--		id="org.sakaiproject.contentreview.service.ContentReviewService"
-+		id="org.sakaiproject.contentreview.service.ContentReviewServiceTii"
- 		class="org.sakaiproject.contentreview.impl.turnitin.TurnitinReviewServiceImpl"
- 		init-method="init">
- 		<property name="dao"
-@@ -75,7 +75,7 @@
- 		class="org.sakaiproject.component.app.scheduler.jobs.ContentReviewQueue">
- 		<property name="contentReviewService">
- 			<ref
--				bean="org.sakaiproject.contentreview.service.ContentReviewService" />
-+				bean="org.sakaiproject.contentreview.service.ContentReviewServiceTii" />
- 		</property>
- 		<property name="sessionManager">
- 			<ref bean="org.sakaiproject.tool.api.SessionManager" />
-@@ -102,7 +102,7 @@
- 		class="org.sakaiproject.component.app.scheduler.jobs.ContentReviewReports">
- 		<property name="contentReviewService">
- 			<ref
--				bean="org.sakaiproject.contentreview.service.ContentReviewService" />
-+				bean="org.sakaiproject.contentreview.service.ContentReviewServiceTii" />
- 		</property>
- 	</bean>
+@@ -28,6 +28,8 @@
+         <dependency>
+             <groupId>org.sakaiproject.assignment2</groupId>
+             <artifactId>sakai-assignment2-api</artifactId>
++            <version>2.8-SNAPSHOT</version>
++            <scope>provided</scope>
+         </dependency>
+         -->
  
-@@ -149,7 +149,7 @@
- <bean class="org.sakaiproject.contentreview.impl.turnitin.TurnitinRosterSync"
-     id="org.sakaiproject.contentreview.impl.turnitin.TurnitinRosterSync"
-     init-method="init">
--    <property name="turnitinReviewServiceImpl" ref="org.sakaiproject.contentreview.service.ContentReviewService" />
-+    <property name="turnitinReviewServiceImpl" ref="org.sakaiproject.contentreview.service.ContentReviewServiceTii" />
-     <property name="siteService" ref="org.sakaiproject.site.api.SiteService" />
-     <property name="userDirectoryService" ref="org.sakaiproject.user.api.UserDirectoryService" />
-     <property name="turnitinConn" ref="org.sakaiproject.contentreview.impl.turnitin.TurnitinAccountConnection" />
-@@ -172,7 +172,7 @@
-     <property name="turnitinRosterSync" ref="org.sakaiproject.contentreview.impl.turnitin.TurnitinRosterSync" />
-     <property name="dao" ref="org.sakaiproject.contentreview.dao.ContentReviewDao" />
-     <property name="siteService" ref="org.sakaiproject.site.api.SiteService" />
--    <property name="contentReviewService" ref="org.sakaiproject.contentreview.service.ContentReviewService" />
-+    <property name="contentReviewService" ref="org.sakaiproject.contentreview.service.ContentReviewServiceTii" />
-    </bean>
+Index: hbm/pom.xml
+===================================================================
+--- hbm/pom.xml	(revision 87007)
++++ hbm/pom.xml	(working copy)
+@@ -19,7 +19,7 @@
+     <parent>
+         <artifactId>content-review-impl-base-tii</artifactId>
+         <groupId>org.sakaiproject.contentreview</groupId>
+-        <version>11-SNAPSHOT</version>
++        <version>0.9-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
  
-    <bean id="org.sakaiproject.contentreview.impl.turnitin.TurnitinAccountConnection"
+Index: scheduler-jobs/pom.xml
+===================================================================
+--- scheduler-jobs/pom.xml	(revision 87007)
++++ scheduler-jobs/pom.xml	(working copy)
+@@ -4,7 +4,7 @@
+ 	<parent>
+ 		<artifactId>content-review-impl-base-tii</artifactId>
+ 		<groupId>org.sakaiproject.contentreview</groupId>
+-		<version>11-SNAPSHOT</version>
++		<version>0.9-SNAPSHOT</version>
+ 		<relativePath>../pom.xml</relativePath>
+ 	</parent>
+ 
+@@ -17,10 +17,14 @@
+ 			<groupId>org.sakaiproject.contentreview</groupId>
+ 			<artifactId>contentreview-service-api</artifactId>
+ 		</dependency>
++
+ 		<dependency>
+-            		<groupId>org.quartz-scheduler</groupId>
+-            		<artifactId>quartz</artifactId>
+-        	</dependency>
++			<groupId>quartz</groupId>
++			<artifactId>quartz</artifactId>
++			<version>1.5.2</version>
++			<scope>provided</scope>
++		</dependency>
++
+ 		<dependency>
+ 			<groupId>org.sakaiproject.scheduler</groupId>
+ 			<artifactId>scheduler-api</artifactId>
 Index: pom.xml
 ===================================================================
---- pom.xml	(revision 86574)
+--- pom.xml	(revision 87007)
 +++ pom.xml	(working copy)
-@@ -3,7 +3,7 @@
- 	<modelVersion>4.0.0</modelVersion>
+@@ -4,16 +4,21 @@
  	<name>Sakai Content Review - Turnitin</name>
  	<groupId>org.sakaiproject.contentreview</groupId>
--	<artifactId>content-review-impl-base</artifactId>
-+	<artifactId>content-review-impl-base-tii</artifactId>
- 	<version>0.9-SNAPSHOT</version>
+ 	<artifactId>content-review-impl-base-tii</artifactId>
+-	<version>11-SNAPSHOT</version>
++	<version>0.9-SNAPSHOT</version>
  	<packaging>pom</packaging>
- 	<!--
-@@ -40,6 +40,7 @@
+-
++	<!--
++		<parent> <artifactId>sakai-commons-tool</artifactId>
++		<groupId>org.sakaiproject.purepoms</groupId>
++		<version>2.8-SNAPSHOT</version> </parent>
++	-->
++	<!-- for 2.6 based builds -->
+ 	<parent>
+-		<artifactId>master</artifactId>
+-		<groupId>org.sakaiproject</groupId>
+-		<version>11-SNAPSHOT</version>
+-		<relativePath>../../master/pom.xml</relativePath>
++		<artifactId>sakai-edu-tool</artifactId>
++		<groupId>org.sakaiproject.purepoms</groupId>
++		<version>2.8.1</version>
+ 	</parent>
+ 
++
+ 	<modules>
+ 		<module>impl</module>
+ 		<module>hbm</module>
+@@ -35,28 +40,80 @@
  
  	<properties>
  	  <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-+	  <contentreview.version>11-SNAPSHOT</contentreview.version>
++	  <contentreview.version>2.9.6-SNAPSHOT</contentreview.version>
  	</properties>
  	
  	<!-- handles the management of all related dependencies -->
-@@ -49,18 +50,18 @@
+ 	<dependencyManagement>
+ 		<dependencies>
++		  <!-- the API is seperately versioned from the impl -->
++			<dependency>
++				<groupId>org.sakaiproject.contentreview</groupId>
++				<artifactId>contentreview-model-api</artifactId>
++				<version>${contentreview.version}</version>
++				<scope>provided</scope>
++			</dependency>
++			<dependency>
++				<groupId>org.sakaiproject.contentreview</groupId>
++				<artifactId>contentreview-service-api</artifactId>
++				<version>${contentreview.version}</version>
++			</dependency>
+ 			<!-- internal dependencies -->
  			<dependency>
  				<groupId>org.sakaiproject.contentreview</groupId>
- 				<artifactId>contentreview-model-api</artifactId>
--				<version>2.9.1</version>
-+				<version>${contentreview.version}</version>
+ 				<artifactId>sakai-contentreview-impl-tii</artifactId>
+-			        <version>${project.version}</version>
++				<version>0.9-SNAPSHOT</version><!--turnitin.version-->
+ 			</dependency>
+ 			<dependency>
+ 				<groupId>org.sakaiproject.contentreview</groupId>
+ 				<artifactId>sakai-contentreview-hbm</artifactId>
+-			        <version>${project.version}</version>
++				<version>0.9-SNAPSHOT</version><!--turnitin.version-->
  				<scope>provided</scope>
  			</dependency>
  			<dependency>
  				<groupId>org.sakaiproject.contentreview</groupId>
- 				<artifactId>contentreview-service-api</artifactId>
--				<version>2.9.1</version>
-+				<version>${contentreview.version}</version>
+ 				<artifactId>contentreview-scheduler</artifactId>
+-			        <version>${project.version}</version>
++				<version>0.9-SNAPSHOT</version><!--turnitin.version-->
  			</dependency>
- 			<!-- internal dependencies -->
- 			<dependency>
- 				<groupId>org.sakaiproject.contentreview</groupId>
--				<artifactId>sakai-contentreview-impl</artifactId>
-+				<artifactId>sakai-contentreview-impl-tii</artifactId>
- 				<version>0.9-SNAPSHOT</version><!--turnitin.version-->
- 			</dependency>
- 			<dependency>
-Index: scheduler-jobs/pom.xml
-===================================================================
---- scheduler-jobs/pom.xml	(revision 86574)
-+++ scheduler-jobs/pom.xml	(working copy)
-@@ -2,7 +2,7 @@
- <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
- 	<modelVersion>4.0.0</modelVersion>
- 	<parent>
--		<artifactId>content-review-impl-base</artifactId>
-+		<artifactId>content-review-impl-base-tii</artifactId>
- 		<groupId>org.sakaiproject.contentreview</groupId>
- 		<version>0.9-SNAPSHOT</version>
- 		<relativePath>../pom.xml</relativePath>
++			<dependency>
++				<groupId>org.sakaiproject.scheduler</groupId>
++				<artifactId>scheduler-api</artifactId>
++				<version>2.8.0</version>
++				<scope>provided</scope>
++			</dependency>
++			<!-- needed for 2.6 based builds -->
++			<!--
++			<dependency>
++				<groupId>org.sakaiproject.common</groupId>
++				<artifactId>sakai-common-composite-component-data</artifactId>
++				<version>[1.0.0, 1.1.0)</version>
++				<scope>provided</scope>
++			</dependency>
++			<dependency>
++				<groupId>org.sakaiproject.common</groupId>
++				<artifactId>sakai-common-edu-person-api</artifactId>
++				<version>[1.0.0, 1.1.0)</version>
++				<scope>provided</scope>
++			</dependency>
++			<dependency>
++				<groupId>org.sakaiproject.common</groupId>
++				<artifactId>sakai-common-manager-api</artifactId>
++				<version>[1.0.0, 1.1.0)</version>
++				<scope>provided</scope>
++			</dependency>
++			<dependency>
++				<groupId>org.sakaiproject.common</groupId>
++				<artifactId>sakai-common-type-api</artifactId>
++				<version>[1.0.0, 1.1.0)</version>
++				<scope>provided</scope>
++			</dependency>
++			<dependency>
++				<groupId>org.sakaiproject.common</groupId>
++				<artifactId>sakai-privacy-api</artifactId>
++				<version>[1.0.0, 1.1.0)</version>
++				<scope>provided</scope>
++			</dependency>
++			-->
+ 		</dependencies>
+ 	</dependencyManagement>
+ 
 Index: tool/pom.xml
 ===================================================================
---- tool/pom.xml	(revision 86574)
+--- tool/pom.xml	(revision 87007)
 +++ tool/pom.xml	(working copy)
-@@ -18,7 +18,7 @@
-     <modelVersion>4.0.0</modelVersion>
-     <name>Turnitin WebApp</name>
-     <groupId>org.sakaiproject</groupId>
--    <artifactId>sakai-contentreview-tool</artifactId>
-+    <artifactId>sakai-contentreview-tool-tii</artifactId>
-     <description>
-         This project creates a WAR containing the Content Review tool for Sakai.
-     </description>
-@@ -26,7 +26,7 @@
- 
- 
+@@ -28,7 +28,7 @@
      <parent>
--        <artifactId>content-review-impl-base</artifactId>
-+        <artifactId>content-review-impl-base-tii</artifactId>
+         <artifactId>content-review-impl-base-tii</artifactId>
          <groupId>org.sakaiproject.contentreview</groupId>
-         <version>0.9-SNAPSHOT</version>
+-        <version>11-SNAPSHOT</version>
++        <version>0.9-SNAPSHOT</version>
          <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
+Index: pack/pom.xml
+===================================================================
+--- pack/pom.xml	(revision 87007)
++++ pack/pom.xml	(working copy)
+@@ -17,7 +17,7 @@
+     <parent>
+         <artifactId>content-review-impl-base-tii</artifactId>
+         <groupId>org.sakaiproject.contentreview</groupId>
+-        <version>11-SNAPSHOT</version>
++        <version>0.9-SNAPSHOT</version>
+         <relativePath>../pom.xml</relativePath>
+     </parent>
+ 
