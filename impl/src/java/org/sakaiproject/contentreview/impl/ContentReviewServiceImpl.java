@@ -6,6 +6,7 @@ import java.io.InputStreamReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -123,66 +124,72 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 					if(assignmentId != null){
 						HttpClient client = HttpClientBuilder.create().useSystemProperties().build();
 						HttpPost post = new HttpPost(generateUrl(contextId, assignmentId, null));
-						MultipartEntityBuilder builder = MultipartEntityBuilder.create();        
+						MultipartEntityBuilder builder = MultipartEntityBuilder.create();
+						builder.setCharset(Charset.forName("UTF-8"));
 						builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
-						builder.addTextBody(PARAM_CONSUMER, consumer);
-						builder.addTextBody(PARAM_CONSUMER_SECRET, consumerSecret);
-						builder.addTextBody(PARAM_UPDATE_ASSIGNMNET_DETAILS, "true");
-						if(opts != null){
-							if(opts.containsKey("title")){
-								builder.addTextBody(PARAM_ASSIGNMENT_TITLE, opts.get("title").toString());
-							}else if(!isA2){
-								//we can find the title from the assignment ref for A1
-								String assignmentTitle = getAssignmentTitle(assignmentRef);
-								if(assignmentTitle != null){
-									builder.addTextBody(PARAM_ASSIGNMENT_TITLE, assignmentTitle);
-								}
-							}
-							if(opts.containsKey("instructions")){
-								try {
-									builder.addTextBody(PARAM_ASSIGNMENT_INSTRUCTIONS, URLEncoder.encode(opts.get("instructions").toString(), "UTF-8"));
-								} catch (UnsupportedEncodingException e) {
-									log.error(e.getMessage(), e);
-								}
-							}
-							if(opts.containsKey("attachments") && opts.get("attachments") instanceof List){
-								int i = 1;
-								SecurityAdvisor yesMan = new SecurityAdvisor(){
-									public SecurityAdvice isAllowed(String arg0, String arg1, String arg2) {
-										return SecurityAdvice.ALLOWED;
-									}
-								};
-								securityService.pushAdvisor(yesMan);
-								try{
-									for(String refStr : (List<String>) opts.get("attachments")){
-										try {
-											Reference ref = entityManager.newReference(refStr);
-											ContentResource res = (ContentResource) ref.getEntity();
-											if(res != null){
-												String fileName = res.getProperties().getProperty(ResourceProperties.PROP_DISPLAY_NAME);
-												ContentBody bin = new ByteArrayBody(res.getContent(), fileName);
-												builder.addPart(PARAM_ASSIGNMENT_ATTACHMENT_DATA + i, bin);
-												builder.addTextBody(PARAM_ASSIGNMENT_ATTACHMENT_EXTERNAL_ID + i, res.getId());
-												i++;
-											}
-										} catch (Exception e){
-											log.error(e.getMessage(), e);
-										}
-									}
-								}catch(Exception e){
-									log.error(e.getMessage(), e);
-								}finally{
-									securityService.popAdvisor(yesMan);
-								}
-							}
-						}
-						final HttpEntity entity = builder.build();
-						post.setEntity(entity);
 						try {
-							HttpResponse response = client.execute(post);
-						} catch (ClientProtocolException e) {
-							log.error(e.getMessage(), e);
-						} catch (IOException e) {
+							builder.addTextBody(PARAM_CONSUMER, URLEncoder.encode(consumer, "UTF-8"));
+
+							builder.addTextBody(PARAM_CONSUMER_SECRET, URLEncoder.encode(consumerSecret, "UTF-8"));
+							builder.addTextBody(PARAM_UPDATE_ASSIGNMNET_DETAILS, URLEncoder.encode("true", "UTF-8"));
+							if(opts != null){
+								if(opts.containsKey("title")){
+									builder.addTextBody(PARAM_ASSIGNMENT_TITLE, URLEncoder.encode(opts.get("title").toString(), "UTF-8"));
+								}else if(!isA2){
+									//we can find the title from the assignment ref for A1
+									String assignmentTitle = getAssignmentTitle(assignmentRef);
+									if(assignmentTitle != null){
+										builder.addTextBody(PARAM_ASSIGNMENT_TITLE, URLEncoder.encode(assignmentTitle, "UTF-8"));
+									}
+								}
+								if(opts.containsKey("instructions")){
+									try {
+										builder.addTextBody(PARAM_ASSIGNMENT_INSTRUCTIONS, URLEncoder.encode(opts.get("instructions").toString(), "UTF-8"));
+									} catch (UnsupportedEncodingException e) {
+										log.error(e.getMessage(), e);
+									}
+								}
+								if(opts.containsKey("attachments") && opts.get("attachments") instanceof List){
+									int i = 1;
+									SecurityAdvisor yesMan = new SecurityAdvisor(){
+										public SecurityAdvice isAllowed(String arg0, String arg1, String arg2) {
+											return SecurityAdvice.ALLOWED;
+										}
+									};
+									securityService.pushAdvisor(yesMan);
+									try{
+										for(String refStr : (List<String>) opts.get("attachments")){
+											try {
+												Reference ref = entityManager.newReference(refStr);
+												ContentResource res = (ContentResource) ref.getEntity();
+												if(res != null){
+													String fileName = res.getProperties().getProperty(ResourceProperties.PROP_DISPLAY_NAME);
+													ContentBody bin = new ByteArrayBody(res.getContent(), fileName);
+													builder.addPart(PARAM_ASSIGNMENT_ATTACHMENT_DATA + i, bin);
+													builder.addTextBody(PARAM_ASSIGNMENT_ATTACHMENT_EXTERNAL_ID + i, URLEncoder.encode(res.getId(), "UTF-8"));
+													i++;
+												}
+											} catch (Exception e){
+												log.error(e.getMessage(), e);
+											}
+										}
+									}catch(Exception e){
+										log.error(e.getMessage(), e);
+									}finally{
+										securityService.popAdvisor(yesMan);
+									}
+								}
+							}
+							final HttpEntity entity = builder.build();
+							post.setEntity(entity);
+							try {
+								HttpResponse response = client.execute(post);
+							} catch (ClientProtocolException e) {
+								log.error(e.getMessage(), e);
+							} catch (IOException e) {
+								log.error(e.getMessage(), e);
+							}
+						} catch (UnsupportedEncodingException e) {
 							log.error(e.getMessage(), e);
 						}
 					}
@@ -558,24 +565,25 @@ public class ContentReviewServiceImpl implements ContentReviewService {
 								HttpClient client = HttpClientBuilder.create().useSystemProperties().build();
 								HttpPost post = new HttpPost(generateUrl(contextParam, assignmentParam, userId));
 								try {
-									MultipartEntityBuilder builder = MultipartEntityBuilder.create();        
+									MultipartEntityBuilder builder = MultipartEntityBuilder.create();      
+									builder.setCharset(Charset.forName("UTF-8"));
 									builder.setMode(HttpMultipartMode.BROWSER_COMPATIBLE);
-									builder.addTextBody(PARAM_CONSUMER, consumer);
-									builder.addTextBody(PARAM_CONSUMER_SECRET, consumerSecret);
-									builder.addTextBody(PARAM_USER_FIRST_NAME, userFirstNameParam);
-									builder.addTextBody(PARAM_USER_LAST_NAME, userLastNameParam);
-									builder.addTextBody(PARAM_USER_EMAIL, userEmailParam);
-									builder.addTextBody(PARAM_USER_ROLE, userRoleParam);
+									builder.addTextBody(PARAM_CONSUMER, URLEncoder.encode(consumer, "UTF-8"));
+									builder.addTextBody(PARAM_CONSUMER_SECRET, URLEncoder.encode(consumerSecret, "UTF-8"));
+									builder.addTextBody(PARAM_USER_FIRST_NAME, URLEncoder.encode(userFirstNameParam, "UTF-8"));
+									builder.addTextBody(PARAM_USER_LAST_NAME, URLEncoder.encode(userLastNameParam, "UTF-8"));
+									builder.addTextBody(PARAM_USER_EMAIL, URLEncoder.encode(userEmailParam, "UTF-8"));
+									builder.addTextBody(PARAM_USER_ROLE, URLEncoder.encode(userRoleParam, "UTF-8"));
 									String assignmentTitle = getAssignmentTitle(assignmentReference);
 									if(assignmentTitle != null){
-										builder.addTextBody(PARAM_ASSIGNMENT_TITLE, assignmentTitle);
+										builder.addTextBody(PARAM_ASSIGNMENT_TITLE, URLEncoder.encode(assignmentTitle, "UTF-8"));
 									}
 									if(fileSubmissions != null){
 										int i = 1;
 										for(FileSubmission f : fileSubmissions){
 											ContentBody bin = new ByteArrayBody(f.data, f.fileName);
 											builder.addPart(PARAM_FILE_DATA + i, bin);
-											builder.addTextBody(PARAM_EXTERNAL_CONTENT_ID + i, f.contentId);
+											builder.addTextBody(PARAM_EXTERNAL_CONTENT_ID + i, URLEncoder.encode(f.contentId, "UTF-8"));
 											i++;
 										}
 									}
